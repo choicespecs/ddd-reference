@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Domain-Driven Design is a way of organizing software around the business problem instead of around the database or the framework.">
+<title>DDD fundamentals — DDD Spring + Vue Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Spring + Vue Guide</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Start here</a></li>
+<li><a href="data-flow.html">DB to screen: the full data flow</a></li>
+</ol>
+<div class="nav-group">Concepts</div><ol>
+<li><a href="ddd-fundamentals.html" aria-current="page" class="on">DDD fundamentals</a></li>
+<li><a href="strategic-design.html">Strategic design</a></li>
+<li><a href="tactical-patterns.html">Tactical patterns</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture-styles.html">Architecture styles</a></li>
+<li><a href="project-structure.html">Project structure</a></li>
+</ol>
+<div class="nav-group">Backend</div><ol>
+<li><a href="persistence.html">Persistence with JPA &amp; Hibernate</a></li>
+<li><a href="application-layer.html">Application layer &amp; use cases</a></li>
+<li><a href="domain-events.html">Domain &amp; integration events</a></li>
+<li><a href="rest-api.html">REST API design</a></li>
+</ol>
+<div class="nav-group">Frontend</div><ol>
+<li><a href="vue-frontend.html">Vue frontend</a></li>
+</ol>
+<div class="nav-group">Quality &amp; ops</div><ol>
+<li><a href="testing.html">Testing</a></li>
+<li><a href="security-config-deploy.html">Security, config &amp; deployment</a></li>
+</ol>
+<div class="nav-group">Decisions</div><ol>
+<li><a href="decisions.html">Design decisions (ADR log)</a></li>
+<li><a href="make-it-yours.html">Starting your own app</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="sample-walkthrough.html">Sample app tour</a></li>
+<li><a href="glossary.html">Glossary</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Concepts</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Concepts</span>
+          <h1>DDD fundamentals</h1>
+          <p class="lede">Domain-Driven Design is a way of organizing software around the business problem instead of around the database or the framework.</p>
+        </header>
+        <h2 id="what-is-ddd">What DDD actually is</h2>
+<p>Eric Evans introduced DDD in <em>Domain-Driven Design: Tackling Complexity in the Heart of Software</em> (2003). It has two halves:</p>
+<table>
+  <thead><tr><th></th><th>Strategic design</th><th>Tactical design</th></tr></thead>
+  <tbody>
+    <tr><td>Question</td><td>How do we split a large problem into parts, and how do the parts relate?</td><td>How do we write the code inside one part so the business rules are explicit and protected?</td></tr>
+    <tr><td>Tools</td><td>Subdomains, bounded contexts, context maps, ubiquitous language</td><td>Entities, value objects, aggregates, repositories, domain services, domain events, factories</td></tr>
+    <tr><td>Who's involved</td><td>Developers + domain experts + architects</td><td>Mostly developers (with domain experts validating)</td></tr>
+    <tr><td>In this repo</td><td><a href="strategic-design.html">Strategic design</a></td><td><a href="tactical-patterns.html">Tactical patterns</a></td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><span class="label">Common mistake</span>
+<p>Teams often adopt only the tactical patterns (put an <code>Aggregate</code> suffix on things, add repositories) and skip the strategic part. That gives you all the ceremony and almost none of the benefit. The biggest payoff comes from drawing the <em>right boundaries</em> and using the <em>right words</em>.</p></div>
+
+<h2 id="core-idea">The core idea in one paragraph</h2>
+<p>Business software is hard because the <em>business</em> is complicated, not because Java or SQL is. So put the business rules at the center of the code, in plain objects named the way the business talks. Keep them free of HTTP, SQL, and framework concerns, so they can be read, tested, and changed on their own. Everything else (controllers, ORM, messaging, UI) is a plug-in around that core.</p>
+
+<h2 id="ubiquitous-language">Ubiquitous language</h2>
+<p>The <strong>ubiquitous language</strong> is the shared vocabulary that developers and domain experts use in conversation, in tickets, in the UI, <em>and in the code</em>. When a domain expert says "a customer places an order", the code should say <code>order.place()</code>.</p>
+
+<div class="compare">
+  <div class="bad"><h4>Database/CRUD language</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">orderDto.setStatus(2);
+orderDto.setPlacedTs(new Date());
+orderService.update(orderDto);
+inventoryService.decrement(itemId, qty);</code></pre></div>
+  </div>
+  <div class="good"><h4>Ubiquitous language</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">order.place(clock);
+// raises OrderPlaced → Catalog reserves stock</code></pre></div>
+  </div>
+</div>
+
+<p>Practical rules for building the language:</p>
+<ul>
+  <li><strong>Keep a glossary</strong> (this guide has one: <a href="glossary.html">Glossary</a>). When a new word comes up in a meeting, add it.</li>
+  <li><strong>Watch out for synonyms.</strong> If people say "client", "customer", and "account holder" for the same thing, pick one. If they mean <em>different</em> things, that's a sign of separate concepts, or even separate bounded contexts.</li>
+  <li><strong>Rename code when the language changes.</strong> A class still called <code>Ticket</code> after the business switched to saying "Case" will confuse every new developer.</li>
+  <li><strong>Name methods after business actions</strong>, not data changes: <code>cancel()</code>, <code>approve()</code>, <code>reserve()</code>, not <code>setStatus()</code>.</li>
+  <li><strong>Error messages are part of the language.</strong> "Cannot place an empty order" is better than "Validation failed: lines.size &gt; 0".</li>
+</ul>
+
+<h2 id="model">The domain model</h2>
+<p>A <strong>domain model</strong> is a simplified picture of the business that is good enough for the problems this software solves. It does not try to mirror reality completely. The Catalog's <code>Product</code> knows its price and stock. It knows nothing about the product's weight, supplier, or marketing copy, because nobody here needs that yet.</p>
+<p>In code, the model consists of classes that hold <strong>both data and behaviour</strong>. Compare:</p>
+
+<div class="compare">
+  <div class="bad"><h4>Anemic model + transaction script</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Data bag
+public class Order {
+  private String status;
+  private List&lt;OrderLine&gt; lines;
+  // getters + setters for everything
+}
+
+// Rules scattered in services
+public void place(UUID id) {
+  Order o = repo.findById(id).get();
+  if (!o.getStatus().equals("DRAFT"))
+    throw new RuntimeException("bad");
+  if (o.getLines().isEmpty())
+    throw new RuntimeException("empty");
+  o.setStatus("PLACED");
+  repo.save(o);
+}
+// …and another service forgets the
+// empty check and calls setStatus too.</code></pre></div>
+  </div>
+  <div class="good"><h4>Rich model</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public class Order {
+  public void place(Clock clock) {
+    requireStatus(DRAFT, "place the order");
+    if (lines.isEmpty())
+      throw new DomainException(
+        "Cannot place an empty order");
+    status = PLACED;
+    placedAt = clock.instant();
+    registerEvent(new OrderPlaced(…));
+  }
+  // no setStatus() exists — the only way
+  // to reach PLACED is through place().
+}</code></pre></div>
+  </div>
+</div>
+
+<p>The anemic version isn't <em>wrong</em>, and for simple CRUD it's fine. The problem is that the rule "only DRAFT, non-empty orders can be placed" can be bypassed by any code that holds an <code>Order</code>. In the rich model it <em>cannot</em> be bypassed. The class protects its own <strong>invariants</strong>.</p>
+
+<h2 id="when-to-use">When DDD pays off and when it doesn't</h2>
+<table>
+  <thead><tr><th>Use DDD (fully) when…</th><th>Skip or go light when…</th></tr></thead>
+  <tbody>
+    <tr><td>The business rules are complex and change often (pricing, eligibility, workflows, scheduling, claims).</td><td>The app is mostly forms over tables (admin screens, reference data).</td></tr>
+    <tr><td>Several teams or departments use the same words with different meanings.</td><td>One small team, one clear meaning for every term.</td></tr>
+    <tr><td>The software is a competitive differentiator (<em>core domain</em>).</td><td>It's a commodity you could buy off the shelf (<em>generic subdomain</em>).</td></tr>
+    <tr><td>The system will live for years and be maintained by people who didn't write it.</td><td>It's a prototype or a one-off script.</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="label">Mix and match</span>
+<p>You don't have to choose one style for the whole app. A common, healthy setup is a rich DDD model for the core context (here, <em>Ordering</em>) and plain CRUD with Spring Data REST or simple controllers for supporting contexts (e.g. a "Reference data" context for countries and currencies).</p></div>
+
+<h2 id="process">How DDD work actually happens</h2>
+<ol>
+  <li><strong>Discover the domain together.</strong> Run an <a href="strategic-design.html#event-storming">Event Storming</a> session with domain experts: put orange sticky notes on a wall for every business event ("Order placed", "Payment captured", "Stock reserved").</li>
+  <li><strong>Find the boundaries.</strong> Look for clusters of events, and for words that change meaning. These become candidate <a href="strategic-design.html">bounded contexts</a>.</li>
+  <li><strong>Model the core first.</strong> Find the commands, the aggregates that handle them, and the rules (invariants) each aggregate protects.</li>
+  <li><strong>Write the model as plain Java with unit tests</strong> before touching controllers or the database. See <a href="testing.html">Testing</a>.</li>
+  <li><strong>Add adapters</strong>: persistence, REST, UI.</li>
+  <li><strong>Refactor toward deeper insight.</strong> When a domain expert says something that doesn't fit the model, change the model. This is expected and healthy.</li>
+</ol>
+
+<h2 id="reading">Further reading</h2>
+<ul>
+  <li><strong>Learning Domain-Driven Design</strong>, Vlad Khononov (O'Reilly, 2021). The most approachable modern introduction; start here.</li>
+  <li><strong>Implementing Domain-Driven Design</strong>, Vaughn Vernon (2013). The "red book": practical, Java-flavoured, with a deep treatment of aggregates.</li>
+  <li><strong>Domain-Driven Design Distilled</strong>, Vaughn Vernon (2016). A short summary of everything.</li>
+  <li><strong>Domain-Driven Design</strong>, Eric Evans (2003). The original "blue book". Read Part IV (strategic design) even if you skim the rest.</li>
+  <li><strong>Effective Aggregate Design</strong>, Vaughn Vernon. Three free essays; the best material on sizing aggregates.</li>
+  <li><strong>Get Your Hands Dirty on Clean Architecture</strong>, Tom Hombergs. Hexagonal architecture with Spring Boot, very close to this template.</li>
+</ul>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="data-flow.html"><small>← Previous</small>DB to screen: the full data flow</a><a class="next" href="strategic-design.html"><small>Next →</small>Strategic design</a></nav>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

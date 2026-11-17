@@ -1,0 +1,170 @@
+---
+title: Project structure
+lede: Every folder in the backend, what's allowed to go in it, and the tests that keep it that way.
+---
+
+<h2 id="tree">The backend tree</h2>
+<div class="tree">backend/src/main/java/com/example/shop/
+├── ShopApplication.java
+│
+├── sharedkernel/                  ← tiny, stable, used by every context
+│   ├── AggregateRoot.java           @MappedSuperclass: @Version + domain event list
+│   ├── DomainEvent.java
+│   ├── DomainException.java         "a business rule was violated" → HTTP 409
+│   ├── NotFoundException.java       → HTTP 404
+│   └── Money.java                   @Embeddable record
+│
+├── integration/                   ← published language between contexts
+│   ├── OrderPlacedIntegrationEvent.java
+│   └── OrderCancelledIntegrationEvent.java
+│
+├── catalog/                       ← bounded context (supporting, upstream)
+│   ├── domain/                      Product, ProductId, Sku, ProductRepository (port)
+│   ├── application/                 CatalogService, commands, ProductView, StockReservationHandler
+│   ├── infrastructure/              JpaProductRepository (adapter), SpringDataProductRepository
+│   └── web/                         ProductController + request records
+│
+├── ordering/                      ← bounded context (core, downstream)
+│   ├── domain/                      Order, OrderLine, OrderStatus, OrderId, CustomerEmail,
+│   │   └── events/                  OrderPlaced, OrderCancelled          OrderRepository (port)
+│   ├── application/                 OrderApplicationService, Commands, OrderView,
+│   │                                ProductCatalog (port), IntegrationEventTranslator
+│   ├── infrastructure/              JpaOrderRepository, CatalogAdapter (ACL)
+│   └── web/                         OrderController + request records
+│
+└── config/                        ← Spring wiring that belongs to no context
+    ├── ClockConfig.java
+    ├── GlobalExceptionHandler.java
+    └── WebConfig.java               CORS</div>
+
+<h2 id="layers">What goes in each layer</h2>
+<table>
+  <thead><tr><th>Layer</th><th>Contains</th><th>May depend on</th><th>Must NOT contain</th></tr></thead>
+  <tbody>
+    <tr><td><code>domain</code></td><td>Aggregates, entities, value objects, domain services, domain events, repository <em>interfaces</em></td><td>JDK, <code>sharedkernel</code>, JPA annotations (pragmatic)</td><td>Spring annotations, HTTP, SQL, DTOs, logging frameworks, <code>@Transactional</code></td></tr>
+    <tr><td><code>application</code></td><td>Application services (use cases), commands, read models/views, outbound ports to other systems, event handlers/policies</td><td><code>domain</code>, Spring (<code>@Service</code>, <code>@Transactional</code>, events)</td><td>Controllers, JPA repositories, HTTP clients, JSON annotations</td></tr>
+    <tr><td><code>infrastructure</code></td><td>Repository adapters, Spring Data interfaces, ACL adapters, message producers/consumers, external API clients</td><td><code>domain</code>, <code>application</code>, anything technical</td><td>Business rules</td></tr>
+    <tr><td><code>web</code></td><td>REST controllers, request/response DTOs, web-specific mapping</td><td><code>application</code></td><td>Business rules, direct repository access</td></tr>
+  </tbody>
+</table>
+
+```mermaid
+flowchart TB
+  web --> application
+  infrastructure --> application
+  infrastructure --> domain
+  application --> domain
+  domain --> sharedkernel
+  application --> sharedkernel
+```
+
+<h2 id="visibility">Use Java visibility as a design tool</h2>
+<p>Package-private (no modifier) is your best friend in a package-by-feature layout:</p>
+<table>
+  <thead><tr><th>Class</th><th>Visibility</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>SpringDataOrderRepository</code></td><td>package-private</td><td>Nobody can bypass the domain port and call <code>deleteAll()</code></td></tr>
+    <tr><td><code>JpaOrderRepository</code>, <code>CatalogAdapter</code></td><td>package-private</td><td>Spring finds them by component scan; nobody needs to reference them by type</td></tr>
+    <tr><td><code>OrderController</code></td><td>package-private</td><td>Controllers are entry points, never called from Java code</td></tr>
+    <tr><td><code>OrderLine</code> constructor, <code>changeQuantity</code></td><td>package-private</td><td>Only <code>Order</code> may create or modify lines</td></tr>
+    <tr><td><code>StockReservationHandler</code>, <code>IntegrationEventTranslator</code></td><td>package-private</td><td>Invoked by the event bus only</td></tr>
+    <tr><td><code>OrderApplicationService</code>, <code>OrderView</code></td><td>public</td><td>The context's API</td></tr>
+  </tbody>
+</table>
+
+<h2 id="archunit">Enforcing the rules with ArchUnit</h2>
+<p>Documentation goes stale, but tests don't. <code>backend/src/test/java/com/example/shop/architecture/ArchitectureTest.java</code> fails the build if the structure is violated:</p>
+
+```java
+@AnalyzeClasses(packages = "com.example.shop", importOptions = ImportOption.DoNotIncludeTests.class)
+class ArchitectureTest {
+
+    @ArchTest
+    static final ArchRule domain_is_independent = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "..application..", "..infrastructure..", "..web..", "org.springframework..");
+
+    @ArchTest
+    static final ArchRule application_does_not_depend_on_adapters = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat().resideInAnyPackage("..infrastructure..", "..web..");
+
+    @ArchTest
+    static final ArchRule contexts_are_free_of_cycles = slices()
+            .matching("com.example.shop.(*)..")
+            .should().beFreeOfCycles();
+
+    @ArchTest
+    static final ArchRule catalog_does_not_know_ordering = noClasses()
+            .that().resideInAPackage("com.example.shop.catalog..")
+            .should().dependOnClassesThat().resideInAPackage("com.example.shop.ordering..");
+
+    @ArchTest   // only the ACL in ordering.infrastructure may touch Catalog
+    static final ArchRule only_acl_touches_catalog = classes()
+            .that().resideInAPackage("com.example.shop.catalog..")
+            .should().onlyHaveDependentClassesThat().resideOutsideOfPackages(
+                    "com.example.shop.ordering.domain..",
+                    "com.example.shop.ordering.application..",
+                    "com.example.shop.ordering.web..");
+}
+```
+
+<p>Try it: add <code>import com.example.shop.ordering.domain.Order;</code> to any Catalog class and run <code>./mvnw test</code>. The build fails, and the error message names the offending class and line.</p>
+
+<h3 id="more-rules">Other useful rules to add as you grow</h3>
+
+```java
+// Controllers live only in web packages and are named *Controller
+classes().that().areAnnotatedWith(RestController.class)
+        .should().resideInAPackage("..web..").andShould().haveSimpleNameEndingWith("Controller");
+
+// @Transactional only in the application layer
+noClasses().that().resideOutsideOfPackage("..application..")
+        .should().beAnnotatedWith(Transactional.class);
+
+// No field injection anywhere
+noFields().should().beAnnotatedWith(Autowired.class);
+
+// Domain events live in the domain layer
+classes().that().implement(DomainEvent.class).should().resideInAPackage("..domain..");
+```
+
+<h2 id="alternatives">Alternative layouts</h2>
+<h3 id="multi-module">Multi-module Maven/Gradle</h3>
+<p>For larger systems, each context (or even each layer) becomes its own Maven module. The compiler then enforces dependencies: if <code>catalog-domain</code> doesn't declare a dependency on Spring, it <em>can't</em> import Spring.</p>
+<div class="tree">shop/
+├── pom.xml                 (parent, &lt;modules&gt;)
+├── shared-kernel/
+├── catalog/
+│   ├── catalog-domain/     depends on: shared-kernel  (NO Spring)
+│   ├── catalog-app/        depends on: catalog-domain, spring-context, spring-tx
+│   └── catalog-infra/      depends on: catalog-app, spring-data-jpa
+├── ordering/ …
+└── app/                    depends on everything; contains ShopApplication + config</div>
+<p>This gives strong guarantees, but it slows down builds and adds a lot of <code>pom.xml</code> plumbing. A good path is to start with packages plus ArchUnit (like this template) and move to modules when the team grows past what reviews can police.</p>
+
+<h3 id="flat-small">Flat, for small contexts</h3>
+<p>A small supporting context doesn't need four sub-packages. This is fine:</p>
+<div class="tree">referencedata/
+├── Country.java              @Entity, simple
+├── CountryRepository.java    extends JpaRepository
+└── CountryController.java</div>
+
+<h2 id="naming">Naming conventions used</h2>
+<table>
+  <thead><tr><th>Kind</th><th>Convention</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>Aggregate root</td><td>Plain noun from the language</td><td><code>Order</code>, <code>Product</code></td></tr>
+    <tr><td>Typed ID</td><td><code>&lt;Aggregate&gt;Id</code> record</td><td><code>OrderId</code></td></tr>
+    <tr><td>Repository port</td><td><code>&lt;Aggregate&gt;Repository</code></td><td><code>OrderRepository</code></td></tr>
+    <tr><td>Repository adapter</td><td><code>Jpa&lt;Aggregate&gt;Repository</code></td><td><code>JpaOrderRepository</code></td></tr>
+    <tr><td>Spring Data interface</td><td><code>SpringData&lt;Aggregate&gt;Repository</code></td><td><code>SpringDataOrderRepository</code></td></tr>
+    <tr><td>Application service</td><td><code>&lt;Context&gt;Service</code> or <code>&lt;Aggregate&gt;ApplicationService</code></td><td><code>CatalogService</code>, <code>OrderApplicationService</code></td></tr>
+    <tr><td>Read model</td><td><code>&lt;Thing&gt;View</code></td><td><code>OrderView</code></td></tr>
+    <tr><td>Domain event</td><td>Past tense</td><td><code>OrderPlaced</code></td></tr>
+    <tr><td>Integration event</td><td>Past tense + <code>IntegrationEvent</code></td><td><code>OrderPlacedIntegrationEvent</code></td></tr>
+    <tr><td>Request DTO</td><td>Nested record <code>&lt;Action&gt;Request</code> in the controller</td><td><code>AddLineRequest</code></td></tr>
+    <tr><td>Tables</td><td><code>&lt;context&gt;_&lt;thing&gt;</code></td><td><code>ordering_order_line</code></td></tr>
+  </tbody>
+</table>

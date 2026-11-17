@@ -1,0 +1,181 @@
+---
+title: Sample app tour
+lede: A file-by-file map of the template, a curl cookbook for every endpoint, and suggested exercises to extend it.
+---
+
+<h2 id="file-map">File map: where to look for what</h2>
+<table>
+  <thead><tr><th>If you want to see…</th><th>Open</th></tr></thead>
+  <tbody>
+    <tr><td>A rich aggregate with invariants and events</td><td><code>ordering/domain/Order.java</code></td></tr>
+    <tr><td>An entity inside an aggregate</td><td><code>ordering/domain/OrderLine.java</code></td></tr>
+    <tr><td>Value objects</td><td><code>sharedkernel/Money.java</code>, <code>catalog/domain/Sku.java</code>, <code>ordering/domain/CustomerEmail.java</code></td></tr>
+    <tr><td>Typed IDs</td><td><code>OrderId.java</code>, <code>ProductId.java</code></td></tr>
+    <tr><td>Aggregate base class (version + events)</td><td><code>sharedkernel/AggregateRoot.java</code></td></tr>
+    <tr><td>Repository port vs adapter</td><td><code>ordering/domain/OrderRepository.java</code> → <code>ordering/infrastructure/JpaOrderRepository.java</code></td></tr>
+    <tr><td>Application service (use cases, transactions)</td><td><code>ordering/application/OrderApplicationService.java</code></td></tr>
+    <tr><td>Anti-corruption layer</td><td><code>ordering/application/ProductCatalog.java</code> (port) + <code>ordering/infrastructure/CatalogAdapter.java</code></td></tr>
+    <tr><td>Domain → integration event translation</td><td><code>ordering/application/IntegrationEventTranslator.java</code></td></tr>
+    <tr><td>A policy reacting to another context</td><td><code>catalog/application/StockReservationHandler.java</code></td></tr>
+    <tr><td>Thin controller + request DTOs + validation</td><td><code>ordering/web/OrderController.java</code></td></tr>
+    <tr><td>Error mapping to ProblemDetail</td><td><code>config/GlobalExceptionHandler.java</code></td></tr>
+    <tr><td>Schema + seed data</td><td><code>resources/db/migration/V1__…</code>, <code>V2__…</code></td></tr>
+    <tr><td>Configuration</td><td><code>resources/application.yml</code>, <code>application-postgres.yml</code></td></tr>
+    <tr><td>Domain unit tests</td><td><code>test/…/ordering/domain/OrderTest.java</code></td></tr>
+    <tr><td>Architecture rules</td><td><code>test/…/architecture/ArchitectureTest.java</code></td></tr>
+    <tr><td>End-to-end API test</td><td><code>test/…/ordering/web/OrderFlowIntegrationTest.java</code></td></tr>
+    <tr><td>Vue API client + error handling</td><td><code>frontend/src/api/http.ts</code>, <code>ordering.ts</code></td></tr>
+    <tr><td>A Vue screen sending commands</td><td><code>frontend/src/features/ordering/OrderDetailView.vue</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="domain-diagram">Domain model at a glance</h2>
+
+```mermaid
+classDiagram
+  class AggregateRoot {
+    <<abstract>>
+    -long version
+    -List~DomainEvent~ domainEvents
+    #registerEvent(DomainEvent)
+    +pullDomainEvents() List~DomainEvent~
+  }
+  class Order {
+    -UUID id
+    -String customerEmail
+    -OrderStatus status
+    -Instant createdAt
+    -Instant placedAt
+    +startDraft(CustomerEmail, Clock)$ Order
+    +addLine(productId, name, Money, qty)
+    +changeQuantity(productId, qty)
+    +removeLine(productId)
+    +place(Clock)
+    +ship()
+    +cancel(Clock)
+    +total() Money
+  }
+  class OrderLine {
+    -UUID id
+    -UUID productId
+    -String productName
+    -Money unitPrice
+    -int quantity
+    +lineTotal() Money
+  }
+  class Product {
+    -UUID id
+    -String sku
+    -String name
+    -Money price
+    -int stockOnHand
+    -boolean active
+    +create(Sku, name, desc, Money, stock)$ Product
+    +changePrice(Money)
+    +receiveStock(int)
+    +reserve(int)
+    +release(int)
+  }
+  class Money {
+    <<value object>>
+    +BigDecimal amount
+    +String currency
+    +plus(Money) Money
+    +times(int) Money
+  }
+  class OrderStatus {
+    <<enumeration>>
+    DRAFT
+    PLACED
+    SHIPPED
+    CANCELLED
+  }
+  AggregateRoot <|-- Order
+  AggregateRoot <|-- Product
+  Order "1" *-- "0..20" OrderLine
+  OrderLine --> Money
+  Product --> Money
+  Order --> OrderStatus
+  OrderLine ..> Product : productId (by ID only)
+```
+
+<h2 id="state-machine">Order lifecycle</h2>
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT: startDraft()
+  DRAFT --> DRAFT: addLine / changeQuantity / removeLine
+  DRAFT --> PLACED: place() — needs ≥1 line, reserves stock
+  DRAFT --> CANCELLED: cancel()
+  PLACED --> SHIPPED: ship()
+  PLACED --> CANCELLED: cancel() — releases stock
+  SHIPPED --> [*]
+  CANCELLED --> [*]
+```
+
+<h2 id="curl">API cookbook (curl)</h2>
+<p>Start the backend (<code>cd backend &amp;&amp; ./mvnw spring-boot:run</code>), then:</p>
+
+```bash
+# --- Catalog ---------------------------------------------------------------
+curl -s localhost:8080/api/products | jq
+
+curl -s -X POST localhost:8080/api/products -H 'Content-Type: application/json' -d '{
+  "sku": "BOOK-0042", "name": "Patterns of Enterprise Application Architecture",
+  "description": "Fowler", "price": 59.95, "currency": "USD", "initialStock": 5 }' | jq
+
+P=11111111-1111-1111-1111-000000000001
+curl -s -X PUT  localhost:8080/api/products/$P/price -H 'Content-Type: application/json' -d '{"price": 49.00, "currency": "USD"}' | jq
+curl -s -X POST localhost:8080/api/products/$P/stock -H 'Content-Type: application/json' -d '{"quantity": 10}' | jq
+
+# --- Ordering --------------------------------------------------------------
+O=$(curl -s -X POST localhost:8080/api/orders -H 'Content-Type: application/json' \
+      -d '{"customerEmail":"ada@example.com"}' | jq -r .id)
+
+curl -s -X POST localhost:8080/api/orders/$O/lines -H 'Content-Type: application/json' \
+     -d "{\"productId\":\"$P\",\"quantity\":2}" | jq '.lines, .total'
+
+curl -s -X PUT    localhost:8080/api/orders/$O/lines/$P -H 'Content-Type: application/json' -d '{"quantity":3}' | jq .total
+curl -s -X POST   localhost:8080/api/orders/$O/place | jq .status        # "PLACED"
+curl -s           localhost:8080/api/products/$P | jq .stockOnHand        # reduced by 3
+curl -s -X POST   localhost:8080/api/orders/$O/cancel | jq .status       # "CANCELLED"
+curl -s           localhost:8080/api/products/$P | jq .stockOnHand        # restored
+
+# --- Rule violations (all return application/problem+json) -----------------
+E=$(curl -s -X POST localhost:8080/api/orders -H 'Content-Type: application/json' -d '{"customerEmail":"x@y.co"}' | jq -r .id)
+curl -s -X POST localhost:8080/api/orders/$E/place | jq           # 409 "Cannot place an empty order"
+curl -s -X POST localhost:8080/api/orders -H 'Content-Type: application/json' -d '{"customerEmail":"nope"}' | jq   # 400
+curl -s localhost:8080/api/orders/00000000-0000-0000-0000-000000000000 | jq                                         # 404
+```
+
+<h2 id="sql">Peek at the database</h2>
+<p>Open <code>http://localhost:8080/h2-console</code> (JDBC URL <code>jdbc:h2:mem:shop</code>, user <code>sa</code>) and try:</p>
+
+```sql
+SELECT sku, name, stock_on_hand, version FROM catalog_product ORDER BY sku;
+
+SELECT o.status, o.customer_email, l.product_name, l.quantity, l.unit_price_amount
+  FROM ordering_order o JOIN ordering_order_line l ON l.order_id = o.id
+ ORDER BY o.created_at DESC;
+
+SELECT * FROM "flyway_schema_history";
+```
+<p>Watch <code>version</code> go up each time you change a product or order. That's optimistic locking at work.</p>
+
+<h2 id="exercises">Exercises to extend the template</h2>
+<p>Each exercise exercises a specific pattern. They're ordered roughly by difficulty.</p>
+<table>
+  <thead><tr><th>#</th><th>Exercise</th><th>Patterns practiced</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Add <code>Product.rename()</code> and an endpoint + UI to edit names</td><td>Behaviour method, thin controller, Vue form</td></tr>
+    <tr><td>2</td><td>Add a <code>Quantity</code> value object (1–99) and use it in <code>OrderLine</code></td><td>Value object, embeddable or converter</td></tr>
+    <tr><td>3</td><td>Add <code>allowedActions</code> to <code>OrderView</code>; drive the Vue buttons from it</td><td>Read model design, UI without duplicated rules</td></tr>
+    <tr><td>4</td><td>Send a (logged) confirmation "email" with an <code>AFTER_COMMIT</code> listener on <code>OrderPlaced</code></td><td>Transaction phases, side effects</td></tr>
+    <tr><td>5</td><td>Add a <code>Promotion</code> concept: percentage off for a SKU between two dates</td><td>Domain service / policy, <code>DateRange</code> VO</td></tr>
+    <tr><td>6</td><td>Add an <code>OrderSummary</code> JPQL projection for the order list (no aggregate loading)</td><td>CQRS-lite read side</td></tr>
+    <tr><td>7</td><td>Add a <code>Customer</code> context with registration; Ordering references <code>CustomerId</code></td><td>New bounded context, ACL, ArchUnit rule updates</td></tr>
+    <tr><td>8</td><td>Add Spring Security (resource server) + Keycloak in docker-compose; only owners can cancel</td><td><code>CurrentUser</code> port, authorization in the app layer</td></tr>
+    <tr><td>9</td><td>Switch stock reservation to <code>AFTER_COMMIT</code> + outbox with a <code>PENDING_STOCK</code> status</td><td>Eventual consistency, saga</td></tr>
+    <tr><td>10</td><td>Replace H2 with Testcontainers PostgreSQL in all integration tests</td><td>Test fidelity</td></tr>
+  </tbody>
+</table>

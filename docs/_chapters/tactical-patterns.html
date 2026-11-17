@@ -1,0 +1,308 @@
+---
+title: Tactical patterns
+lede: The building blocks inside a bounded context — what each one is, how to write it in Java, and the mistakes to avoid.
+---
+
+<h2 id="overview">Overview</h2>
+
+```mermaid
+flowchart TB
+  subgraph Aggregate["Order aggregate (consistency boundary)"]
+    R["Order «aggregate root, entity»"]
+    L1["OrderLine «entity»"]
+    L2["OrderLine «entity»"]
+    M["Money «value object»"]
+    E["CustomerEmail «value object»"]
+    R --> L1 & L2
+    R --> E
+    L1 --> M
+  end
+  Repo["OrderRepository «repository»"] -- "loads/saves whole aggregate" --> R
+  R -- "raises" --> Ev["OrderPlaced «domain event»"]
+  R -. "references by ID only" .-> P["Product (other aggregate, other context)"]
+```
+
+<table>
+  <thead><tr><th>Pattern</th><th>One-line definition</th><th>Example here</th></tr></thead>
+  <tbody>
+    <tr><td><a href="#value-objects">Value object</a></td><td>Defined by its attributes, immutable, self-validating</td><td><code>Money</code>, <code>Sku</code>, <code>CustomerEmail</code>, <code>OrderId</code></td></tr>
+    <tr><td><a href="#entities">Entity</a></td><td>Has an identity that stays the same while its attributes change</td><td><code>OrderLine</code>, <code>Product</code>, <code>Order</code></td></tr>
+    <tr><td><a href="#aggregates">Aggregate</a></td><td>Cluster of entities + VOs treated as one unit for changes; has a root</td><td><code>Order</code> (+ lines), <code>Product</code></td></tr>
+    <tr><td><a href="#repositories">Repository</a></td><td>Collection-like access to aggregates; hides persistence</td><td><code>OrderRepository</code>, <code>ProductRepository</code></td></tr>
+    <tr><td><a href="#factories">Factory</a></td><td>Encapsulates complex creation</td><td><code>Order.startDraft()</code>, <code>Product.create()</code></td></tr>
+    <tr><td><a href="#domain-services">Domain service</a></td><td>Domain logic that doesn't belong to one entity</td><td>(see example below)</td></tr>
+    <tr><td><a href="#domain-events">Domain event</a></td><td>Something that happened that domain experts care about</td><td><code>OrderPlaced</code>, <code>OrderCancelled</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="value-objects">Value objects</h2>
+<p>A <strong>value object</strong> has no identity. Two <code>Money(10.00, USD)</code> instances are interchangeable, just like two copies of the number 10. Value objects are:</p>
+<ul>
+  <li><strong>Immutable</strong>. You never change one; you replace it. <code>price = price.plus(tax)</code>.</li>
+  <li><strong>Equal by value</strong>. Java <code>record</code>s give you this for free.</li>
+  <li><strong>Self-validating</strong>. An invalid one can't exist, so code that receives a <code>Sku</code> never has to re-check the format.</li>
+  <li><strong>Behaviour-rich</strong>. Arithmetic, formatting, and comparisons live on the type, not in utility classes.</li>
+</ul>
+
+```java
+// sharedkernel/Money.java (simplified)
+@Embeddable
+public record Money(BigDecimal amount, String currency) {
+
+    public Money {                                   // compact constructor = validation
+        Objects.requireNonNull(amount, "amount");
+        Currency.getInstance(currency);              // rejects "XYZ"
+        if (amount.signum() < 0) throw new DomainException("Money cannot be negative");
+        amount = amount.setScale(2, RoundingMode.HALF_EVEN);   // normalize
+    }
+
+    public Money plus(Money other) {
+        requireSameCurrency(other);
+        return new Money(amount.add(other.amount), currency);  // new instance
+    }
+
+    public Money times(int quantity) {
+        return new Money(amount.multiply(BigDecimal.valueOf(quantity)), currency);
+    }
+}
+```
+
+<h3 id="primitive-obsession">Fixing primitive obsession</h3>
+<p><em>Primitive obsession</em> means passing <code>String</code>, <code>UUID</code>, and <code>BigDecimal</code> around for concepts that have rules. It leads to bugs like this one, which compiles happily:</p>
+
+```java
+// Which UUID is which? The compiler can't help.
+void addLine(UUID orderId, UUID productId, int qty);
+service.addLine(productId, orderId, 2);   // swapped — runtime bug
+```
+
+```java
+// Typed IDs make the swap a compile error
+public record OrderId(UUID value) { … }
+public record ProductId(UUID value) { … }
+void addLine(OrderId orderId, ProductId productId, int qty);
+```
+
+<p>Good candidates for value objects: identifiers, money, quantities with units, email/phone, date ranges, addresses, percentages, codes with formats (SKU, IBAN, postal code).</p>
+
+```java
+// A date range VO — note the behaviour that would otherwise be duplicated everywhere
+public record DateRange(LocalDate start, LocalDate end) {
+    public DateRange {
+        if (end.isBefore(start)) throw new DomainException("end before start");
+    }
+    public boolean contains(LocalDate d) { return !d.isBefore(start) && !d.isAfter(end); }
+    public boolean overlaps(DateRange o)  { return !end.isBefore(o.start) && !o.end.isBefore(start); }
+    public long days()                    { return ChronoUnit.DAYS.between(start, end) + 1; }
+}
+```
+
+<h2 id="entities">Entities</h2>
+<p>An <strong>entity</strong> has a <em>thread of identity</em>. An order is still the same order after its lines change. Rules for entities:</p>
+<ul>
+  <li>Equality is based on the ID, not on the attributes.</li>
+  <li>Generate IDs in the domain (<code>UUID.randomUUID()</code>), not in the database, so an entity has its identity before it is saved. This makes events, tests, and equality simpler.</li>
+  <li>Don't expose public setters. Expose intention-revealing methods instead.</li>
+  <li>A no-arg constructor is needed for JPA. Make it <code>protected</code> so application code can't use it.</li>
+</ul>
+
+```java
+@Entity
+public class OrderLine {
+    @Id private UUID id;
+    private UUID productId;
+    private String productName;
+    @Embedded private Money unitPrice;
+    private int quantity;
+
+    protected OrderLine() {}                    // JPA only
+
+    OrderLine(UUID productId, String name, Money unitPrice, int quantity) {   // package-private:
+        this.id = UUID.randomUUID();            // only Order (same package) can create lines
+        …
+        changeQuantity(quantity);               // reuse the validation
+    }
+
+    void changeQuantity(int q) {                // package-private: only via Order
+        if (q < 1 || q > 99) throw new DomainException("Quantity must be between 1 and 99");
+        this.quantity = q;
+    }
+}
+```
+
+<div class="callout"><span class="label">equals/hashCode on JPA entities</span>
+<p>The template doesn't override <code>equals</code> on entities, because aggregates are compared by ID explicitly (<code>order.id().equals(otherId)</code>). If you do put entities in <code>Set</code>s, base <code>equals</code> on the ID. Because IDs are assigned in the constructor rather than by the database, this works without the usual "null ID before persist" problem.</p></div>
+
+<h2 id="aggregates">Aggregates</h2>
+<p>An <strong>aggregate</strong> is a group of objects that must stay consistent <em>together</em>, with one entity as its <strong>root</strong>. It is the most important tactical pattern and the one most often misused.</p>
+
+<h3 id="aggregate-rules">The rules</h3>
+<ol>
+  <li><strong>Protect invariants inside the boundary.</strong> All rules that must be <em>immediately</em> true ("the total equals the sum of the lines", "lines share one currency") are enforced by the root.</li>
+  <li><strong>Outside code holds references to the root only.</strong> Nobody outside <code>Order</code> keeps a reference to an <code>OrderLine</code>. <code>lines()</code> returns an unmodifiable list.</li>
+  <li><strong>Reference other aggregates by ID.</strong> <code>OrderLine</code> stores <code>productId</code>, not a <code>@ManyToOne Product</code>. This keeps aggregates independent, avoids loading huge graphs, and lets contexts split later.</li>
+  <li><strong>One aggregate per transaction</strong> (as a guideline). Changes to other aggregates should happen via domain events, ideally with eventual consistency.</li>
+  <li><strong>Keep them small.</strong> A large aggregate is slow to load and causes lock conflicts.</li>
+</ol>
+
+<div class="callout warn"><span class="label">This template bends rule 4, on purpose</span>
+<p>Placing an order changes the <code>Order</code> and every <code>Product</code> involved in the <em>same</em> transaction (the event handler runs synchronously). That's a pragmatic choice for a monolith: it gives you "never oversell" without sagas. The <a href="domain-events.html">Events</a> chapter shows how to switch to eventual consistency when you need to.</p></div>
+
+<h3 id="aggregate-sizing">Sizing aggregates: an example</h3>
+<p>Should <code>Customer</code> contain a <code>List&lt;Order&gt;</code>? Ask: <em>is there an invariant that spans a customer and all their orders and must be true at every moment?</em> Usually not. "Customers have orders" is a relationship, not an invariant. So <code>Order</code> is its own aggregate and holds a <code>customerId</code>. Otherwise, a customer with 5,000 orders would load all of them every time they change their email, and two orders placed at the same moment would conflict on the customer's version column.</p>
+
+<table>
+  <thead><tr><th>Candidate</th><th>Invariant that spans it?</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>Order + OrderLines</td><td>Total, currency consistency, max lines, frozen after placing</td><td>✅ One aggregate</td></tr>
+    <tr><td>Customer + Orders</td><td>None that must be immediate</td><td>❌ Separate; Order references CustomerId</td></tr>
+    <tr><td>Product + Reviews</td><td>None ("average rating" can lag)</td><td>❌ Separate; compute rating asynchronously</td></tr>
+    <tr><td>Bank account + Transactions</td><td>Balance never below overdraft limit</td><td>⚠️ Together, but don't load all transactions: store a running balance on the account</td></tr>
+  </tbody>
+</table>
+
+<h3 id="aggregate-example">The Order aggregate, annotated</h3>
+
+```java
+@Entity @Table(name = "ordering_order")
+public class Order extends AggregateRoot {            // AggregateRoot: @Version + event list
+
+    @Id private UUID id;
+    private String customerEmail;
+    @Enumerated(EnumType.STRING) private OrderStatus status;
+
+    @OneToMany(cascade = ALL, orphanRemoval = true, fetch = EAGER)  // lines live and die with the order
+    @JoinColumn(name = "order_id", nullable = false)
+    private List<OrderLine> lines = new ArrayList<>();
+
+    public static Order startDraft(CustomerEmail customer, Clock clock) { … }   // factory
+
+    public void addLine(UUID productId, String name, Money unitPrice, int qty) {
+        requireStatus(DRAFT, "add lines");                      // invariant 1
+        findLine(productId).ifPresentOrElse(
+            l -> l.changeQuantity(l.quantity() + qty),          // merge duplicates
+            () -> {
+                if (lines.size() >= MAX_LINES) throw …;         // invariant 4
+                requireSameCurrency(unitPrice);                 // invariant 3
+                lines.add(new OrderLine(productId, name, unitPrice, qty));
+            });
+    }
+
+    public void place(Clock clock) { … registerEvent(new OrderPlaced(…)); }
+    public void cancel(Clock clock) { … }
+    public Money total() { … }                                  // derived, never stored
+
+    public List<OrderLine> lines() { return Collections.unmodifiableList(lines); }
+}
+```
+
+<h2 id="repositories">Repositories</h2>
+<p>A <strong>repository</strong> gives the illusion of an in-memory collection of aggregates. In DDD:</p>
+<ul>
+  <li>There is <strong>one repository per aggregate root</strong>, and none for inner entities. There is no <code>OrderLineRepository</code>.</li>
+  <li>The <strong>interface lives in the domain</strong>, uses domain types, and has only the methods the domain needs.</li>
+  <li>The <strong>implementation lives in infrastructure</strong>.</li>
+</ul>
+
+```java
+// ordering/domain/OrderRepository.java — the port
+public interface OrderRepository {
+    Optional<Order> findById(OrderId id);
+    List<Order> findRecent(int limit);
+    Order save(Order order);
+}
+```
+
+```java
+// ordering/infrastructure — the adapter, backed by Spring Data
+interface SpringDataOrderRepository extends JpaRepository<Order, UUID> {      // package-private
+    List<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
+}
+
+@Repository
+class JpaOrderRepository implements OrderRepository {
+    private final SpringDataOrderRepository jpa;
+    public Optional<Order> findById(OrderId id) { return jpa.findById(id.value()); }
+    …
+}
+```
+<p>Why not let the domain interface extend <code>JpaRepository</code> directly? You can, and it's a common pragmatic shortcut (see the <a href="decisions.html#adr-repositories">decision log</a>). The cost is that <code>JpaRepository</code> exposes about 20 methods, including <code>deleteAll()</code> and <code>findAll()</code> on a table that might hold millions of rows. Every one of those becomes part of your domain's API.</p>
+
+<h2 id="factories">Factories</h2>
+<p>When creating an aggregate involves rules, generating an ID, or setting an initial state, put that logic in a <strong>static factory method</strong> on the root, or in a separate factory class if creation needs other collaborators.</p>
+
+```java
+public static Product create(Sku sku, String name, String description, Money price, int initialStock) {
+    return new Product(ProductId.newId(), sku, name, description, price, initialStock);
+}
+// The constructor is private. "new Product(...)" from outside isn't possible.
+```
+<p>Factory names should come from the ubiquitous language: <code>Order.startDraft()</code> says more than <code>new Order()</code>.</p>
+
+<h2 id="domain-services">Domain services</h2>
+<p>Use a <strong>domain service</strong> when a piece of domain logic doesn't naturally belong to a single entity, usually because it involves several aggregates or a policy. A domain service is stateless, is named in the ubiquitous language, and lives in the <code>domain</code> package.</p>
+
+```java
+// Example (not in the template): pricing that depends on customer tier and promotions
+public class PricingPolicy {
+    public Money priceFor(Product product, CustomerTier tier, List<Promotion> active) {
+        Money base = product.price();
+        Money discounted = active.stream()
+                .filter(p -> p.appliesTo(product.id(), tier))
+                .map(p -> p.apply(base))
+                .min(Comparator.comparing(Money::amount))
+                .orElse(base);
+        return tier == CustomerTier.GOLD ? discounted.percentOff(5) : discounted;
+    }
+}
+```
+
+<table>
+  <thead><tr><th></th><th>Domain service</th><th>Application service</th></tr></thead>
+  <tbody>
+    <tr><td>Contains business rules?</td><td>Yes</td><td>No; it orchestrates</td></tr>
+    <tr><td>Knows about transactions, security, events publishing?</td><td>No</td><td>Yes</td></tr>
+    <tr><td>Package</td><td><code>…domain</code></td><td><code>…application</code></td></tr>
+    <tr><td>Example</td><td><code>PricingPolicy</code>, <code>TransferService</code> (between two accounts)</td><td><code>OrderApplicationService</code></td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><span class="label">Don't overuse them</span>
+<p>If every rule ends up in a "service" and the entities are just getters, you've rebuilt the anemic model. Try putting logic on an entity or value object first.</p></div>
+
+<h2 id="domain-events">Domain events</h2>
+<p>A <strong>domain event</strong> records something meaningful that happened. Name it in the past tense, make it immutable, and include enough data for listeners to act on it.</p>
+
+```java
+public record OrderPlaced(OrderId orderId, List<Line> lines, Money total, Instant occurredAt)
+        implements DomainEvent {
+    public record Line(UUID productId, int quantity) {}
+}
+```
+<p>Aggregates <em>register</em> events, and the application layer <em>publishes</em> them after saving. Events decouple side effects (reserving stock, sending email, updating a search index) from the aggregate that caused them. The full story is in <a href="domain-events.html">Domain &amp; integration events</a>.</p>
+
+<h2 id="specifications">Bonus: specifications and policies</h2>
+<p>When a business rule is a reusable yes/no check, a <strong>specification</strong> object names it:</p>
+
+```java
+public final class EligibleForFreeShipping {
+    private static final Money THRESHOLD = Money.of("50.00", "USD");
+    public boolean isSatisfiedBy(Order order) {
+        return order.total().amount().compareTo(THRESHOLD.amount()) >= 0
+            && order.lines().stream().noneMatch(l -> l.productName().contains("Oversize"));
+    }
+}
+```
+
+<h2 id="checklist">Quick checklist for a new aggregate</h2>
+<ul>
+  <li>☐ The name comes from the ubiquitous language</li>
+  <li>☐ Invariants are listed in the class Javadoc</li>
+  <li>☐ The constructor is private or protected; a factory method exists</li>
+  <li>☐ There are no public setters; methods are named after business actions</li>
+  <li>☐ Collections are exposed unmodifiable</li>
+  <li>☐ Other aggregates are referenced by ID</li>
+  <li>☐ Value objects are used for anything with rules or units</li>
+  <li>☐ Domain events are registered for things others care about</li>
+  <li>☐ It has unit tests for every invariant, with no Spring</li>
+  <li>☐ It has a repository interface in <code>domain</code> and an adapter in <code>infrastructure</code></li>
+</ul>

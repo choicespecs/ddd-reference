@@ -1,0 +1,257 @@
+---
+title: Security, config & deployment
+lede: What the template leaves out on purpose, and how to add it — authentication, authorization, configuration per environment, packaging, and serving the Vue app.
+---
+
+<h2 id="security-overview">Security: what to add first</h2>
+<div class="callout danger"><span class="label">The template has no authentication</span>
+<p>Every endpoint is open, which is fine for learning. Add the following before anything is reachable from a network you don't control.</p></div>
+
+<p>There are two common setups for a Vue SPA + Spring Boot API:</p>
+<table>
+  <thead><tr><th></th><th>A. Backend-for-Frontend (session cookie)</th><th>B. SPA holds a JWT (bearer token)</th></tr></thead>
+  <tbody>
+    <tr><td>Flow</td><td>Spring Boot does the OAuth2/OIDC login (<code>oauth2Login</code>) and keeps tokens server-side. The browser gets an HttpOnly session cookie.</td><td>Vue logs in with an OIDC library (PKCE), stores the access token, and sends <code>Authorization: Bearer …</code></td></tr>
+    <tr><td>Spring config</td><td><code>spring-boot-starter-oauth2-client</code></td><td><code>spring-boot-starter-oauth2-resource-server</code></td></tr>
+    <tr><td>Token exposure to JS</td><td>None (more secure)</td><td>Token in memory, so XSS can steal it</td></tr>
+    <tr><td>CSRF protection</td><td>Required (cookie auth)</td><td>Not needed</td></tr>
+    <tr><td>Works for other clients (mobile)</td><td>Needs a separate resource-server chain</td><td>Yes</td></tr>
+    <tr><td>Recommended when</td><td>Same-origin SPA; current OAuth best practice for browser apps</td><td>The API is shared by many clients</td></tr>
+  </tbody>
+</table>
+<p>The identity provider is a <em>generic subdomain</em>, so buy it rather than build it: Keycloak (self-hosted), Okta/Auth0, Microsoft Entra ID, AWS Cognito.</p>
+
+<h3 id="resource-server">Example: resource server (JWT)</h3>
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+</dependency>
+```
+
+```yaml
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.example.com/realms/shop   # Keycloak realm, Entra tenant, etc.
+```
+
+```java
+@Configuration
+@EnableMethodSecurity
+class SecurityConfig {
+    @Bean
+    SecurityFilterChain api(HttpSecurity http) throws Exception {
+        return http
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                .requestMatchers("/api/products/**").hasRole("CATALOG_ADMIN")
+                .requestMatchers("/api/**").authenticated()
+                .anyRequest().permitAll())                       // static Vue files
+            .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(csrf -> csrf.disable())                        // OK only for stateless bearer-token APIs
+            .build();
+    }
+}
+```
+
+<h3 id="authorization">Authorization in a DDD codebase</h3>
+<p>Put coarse rules ("must be logged in", "must be an admin") in the security config. Put fine-grained rules ("only the customer who owns the order may cancel it") in the application layer, through a port, so they stay testable without Spring Security:</p>
+
+```java
+public interface CurrentUser {
+    String email();
+    boolean hasRole(String role);
+}
+
+public OrderView cancel(UUID orderId) {
+    Order order = load(orderId);
+    if (!order.customerEmail().value().equals(currentUser.email()) && !currentUser.hasRole("SUPPORT"))
+        throw new AccessDeniedException("Not your order");
+    order.cancel(clock);
+    return saveAndPublish(order);
+}
+```
+
+```java
+// Adapter in infrastructure
+@Component
+class SpringSecurityCurrentUser implements CurrentUser {
+    public String email() {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return jwt.getClaimAsString("email");
+    }
+    public boolean hasRole(String role) { … }
+}
+```
+<p>If a permission is really a <em>business rule</em> (for example, "orders over $10,000 need a manager's approval"), model it in the domain: <code>order.approve(Approver approver)</code>.</p>
+
+<h3 id="security-checklist">Security checklist</h3>
+<ul>
+  <li>☐ Authentication on every <code>/api/**</code> endpoint that isn't intentionally public</li>
+  <li>☐ Authorization on the resource itself (ownership checks), not just on the role</li>
+  <li>☐ Request DTOs whitelist the fields a client may set. Never bind entities.</li>
+  <li>☐ ProblemDetail <code>detail</code> never contains stack traces or SQL (the template sets <code>server.error.include-message: always</code> for the domain messages; keep <code>include-stacktrace: never</code>)</li>
+  <li>☐ CORS allow-list from configuration, never <code>*</code> together with credentials</li>
+  <li>☐ Secrets from environment variables or a vault, never committed</li>
+  <li>☐ Dependency scanning (<code>./mvnw org.owasp:dependency-check-maven:check</code>, <code>npm audit</code>, Dependabot)</li>
+  <li>☐ Actuator: expose only <code>health</code>/<code>info</code> publicly</li>
+  <li>☐ Security headers (CSP, HSTS) from Spring Security or the reverse proxy</li>
+</ul>
+
+<h2 id="config">Configuration per environment</h2>
+
+```text
+backend/src/main/resources/
+├── application.yml             defaults (local dev: H2)
+├── application-postgres.yml    local Postgres via docker compose
+├── application-test.yml        (add) test overrides
+└── application-prod.yml        (add) production — values come from env vars
+```
+
+```yaml
+# application-prod.yml
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  h2.console.enabled: false
+  jpa.show-sql: false
+app:
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:https://shop.example.com}
+server:
+  error:
+    include-stacktrace: never
+```
+<p>Activate it with <code>SPRING_PROFILES_ACTIVE=prod</code>. Any property can be overridden with an environment variable using relaxed binding: <code>spring.datasource.url</code> → <code>SPRING_DATASOURCE_URL</code>.</p>
+
+<h3 id="typed-config">Typed configuration</h3>
+
+```java
+@ConfigurationProperties(prefix = "app.ordering")
+public record OrderingProperties(int maxLinesPerOrder, Duration draftExpiry) {}
+
+// enable with @EnableConfigurationProperties(OrderingProperties.class) or @ConfigurationPropertiesScan
+```
+<p>Note that business limits like <code>MAX_LINES</code> are constants in the domain in the template. Move them to configuration only if the business wants to change them without a release. When you do, pass the value into the domain method rather than injecting Spring config into entities.</p>
+
+<h2 id="build">Building</h2>
+
+```bash
+# Backend: runnable fat JAR
+cd backend && ./mvnw clean package
+java -jar target/shop-0.1.0-SNAPSHOT.jar
+
+# Frontend: static files
+cd frontend && npm ci && npm run build      # → frontend/dist
+```
+
+<h2 id="serve-vue">Serving the Vue app from Spring Boot</h2>
+<p>To ship a single JAR, copy the Vue build into Spring Boot's static resources and forward unknown routes to <code>index.html</code> so the Vue router can handle deep links.</p>
+
+```xml
+<!-- backend/pom.xml: build the frontend during `mvn package` -->
+<plugin>
+  <groupId>com.github.eirslett</groupId>
+  <artifactId>frontend-maven-plugin</artifactId>
+  <version>1.15.1</version>
+  <configuration>
+    <workingDirectory>../frontend</workingDirectory>
+    <nodeVersion>v22.12.0</nodeVersion>
+  </configuration>
+  <executions>
+    <execution><id>install-node</id><goals><goal>install-node-and-npm</goal></goals></execution>
+    <execution><id>npm-ci</id><goals><goal>npm</goal></goals><configuration><arguments>ci</arguments></configuration></execution>
+    <execution><id>npm-build</id><goals><goal>npm</goal></goals><configuration><arguments>run build</arguments></configuration></execution>
+  </executions>
+</plugin>
+<plugin>
+  <artifactId>maven-resources-plugin</artifactId>
+  <executions>
+    <execution>
+      <id>copy-frontend</id>
+      <phase>process-resources</phase>
+      <goals><goal>copy-resources</goal></goals>
+      <configuration>
+        <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+        <resources><resource><directory>../frontend/dist</directory></resource></resources>
+      </configuration>
+    </execution>
+  </executions>
+</plugin>
+```
+
+```java
+// SPA fallback: any non-API, non-file path → index.html
+@Controller
+class SpaForwardingController {
+    @GetMapping({"/", "/products/**", "/orders/**"})
+    String forward() {
+        return "forward:/index.html";
+    }
+}
+```
+
+<h2 id="docker">Docker</h2>
+
+```text
+# Dockerfile (repo root) — multi-stage: build frontend, build backend, slim runtime
+FROM node:22-alpine AS web
+WORKDIR /web
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+FROM eclipse-temurin:17-jdk AS api
+WORKDIR /src
+COPY backend/ ./
+COPY --from=web /web/dist ./src/main/resources/static
+RUN ./mvnw -q -DskipTests package
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=api /src/target/*.jar app.jar
+USER 1000
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]
+```
+<p>An alternative that needs no Dockerfile is <code>./mvnw spring-boot:build-image</code>, which produces an OCI image using Cloud Native Buildpacks.</p>
+
+<h2 id="observability">Observability</h2>
+<ul>
+  <li><strong>Health/readiness</strong>: <code>/actuator/health</code>, plus <code>management.endpoint.health.probes.enabled=true</code> for Kubernetes liveness and readiness probes.</li>
+  <li><strong>Metrics</strong>: add <code>micrometer-registry-prometheus</code>. Record business metrics too, e.g. <code>meterRegistry.counter("orders.placed").increment()</code> in an <code>OrderPlaced</code> listener.</li>
+  <li><strong>Tracing</strong>: <code>micrometer-tracing-bridge-otel</code> + an OTLP exporter.</li>
+  <li><strong>Logging</strong>: structured JSON logs (<code>logging.structured.format.console=ecs</code> in Boot 3.4+). Log domain events at INFO level, because they make an excellent audit trail.</li>
+</ul>
+
+<h2 id="ci">CI pipeline sketch</h2>
+
+```yaml
+# .github/workflows/ci.yml
+name: ci
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17', cache: maven }
+      - run: cd backend && ./mvnw -B verify
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: cd frontend && npm ci && npm run build
+```

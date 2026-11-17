@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How rows in the database become things on the Vue page and back again. One click traced through all seven hops.">
+<title>DB to screen: the full data flow — DDD Spring + Vue Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Spring + Vue Guide</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Start here</a></li>
+<li><a href="data-flow.html" aria-current="page" class="on">DB to screen: the full data flow</a></li>
+</ol>
+<div class="nav-group">Concepts</div><ol>
+<li><a href="ddd-fundamentals.html">DDD fundamentals</a></li>
+<li><a href="strategic-design.html">Strategic design</a></li>
+<li><a href="tactical-patterns.html">Tactical patterns</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture-styles.html">Architecture styles</a></li>
+<li><a href="project-structure.html">Project structure</a></li>
+</ol>
+<div class="nav-group">Backend</div><ol>
+<li><a href="persistence.html">Persistence with JPA &amp; Hibernate</a></li>
+<li><a href="application-layer.html">Application layer &amp; use cases</a></li>
+<li><a href="domain-events.html">Domain &amp; integration events</a></li>
+<li><a href="rest-api.html">REST API design</a></li>
+</ol>
+<div class="nav-group">Frontend</div><ol>
+<li><a href="vue-frontend.html">Vue frontend</a></li>
+</ol>
+<div class="nav-group">Quality &amp; ops</div><ol>
+<li><a href="testing.html">Testing</a></li>
+<li><a href="security-config-deploy.html">Security, config &amp; deployment</a></li>
+</ol>
+<div class="nav-group">Decisions</div><ol>
+<li><a href="decisions.html">Design decisions (ADR log)</a></li>
+<li><a href="make-it-yours.html">Starting your own app</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="sample-walkthrough.html">Sample app tour</a></li>
+<li><a href="glossary.html">Glossary</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Start</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Start</span>
+          <h1>DB to screen: the full data flow</h1>
+          <p class="lede">How rows in the database become things on the Vue page and back again. One click traced through all seven hops.</p>
+        </header>
+        <h2 id="short-answer">The short answer</h2>
+<p>Yes, the UI is "populated from the DB", but never <em>directly</em>. Vue never sees a table or an entity. It sees JSON shaped for the screen. Each layer in between changes the data's shape on purpose:</p>
+
+<pre class="mermaid">
+flowchart TB
+  A["SQL row&lt;br/&gt;ordering_order + ordering_order_line"] --&gt;|"Hibernate maps rows → objects"| B["Order aggregate&lt;br/&gt;(JPA entity, rich behaviour)"]
+  B --&gt;|"Application service maps → read model"| C["OrderView record&lt;br/&gt;(flat, no behaviour)"]
+  C --&gt;|"Jackson serializes"| D["JSON over HTTP&lt;br/&gt;{ id, status, lines[], total }"]
+  D --&gt;|"fetch() + TypeScript interface"| E["Order (TS type)&lt;br/&gt;in a Vue ref()"]
+  E --&gt;|"reactivity re-renders"| F["Table rows, badges, buttons"]
+</pre>
+
+<table>
+  <thead><tr><th>Shape</th><th>Lives in</th><th>Optimized for</th></tr></thead>
+  <tbody>
+    <tr><td>Table rows</td><td>PostgreSQL / H2</td><td>Storage, integrity constraints, queries</td></tr>
+    <tr><td>Aggregate (<code>Order</code>)</td><td><code>ordering.domain</code></td><td>Enforcing business rules</td></tr>
+    <tr><td>Read model (<code>OrderView</code>)</td><td><code>ordering.application</code></td><td>Giving the caller exactly what it needs</td></tr>
+    <tr><td>JSON</td><td>The wire</td><td>A stable contract between backend and frontend</td></tr>
+    <tr><td>TS interface + ref</td><td><code>frontend/src/api</code>, views</td><td>Type-safe rendering and reactivity</td></tr>
+  </tbody>
+</table>
+
+<h2 id="read-path">Read path: opening an order page</h2>
+<p>The user navigates to <code>/orders/7f3c…</code>. Here is every hop.</p>
+
+<h3 id="read-1-vue">1. Vue route → view component</h3>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// frontend/src/router.ts
+{ path: '/orders/:id', component: () =&gt; import('./features/ordering/OrderDetailView.vue'), props: true }</code></pre></div>
+
+<div class="code"><div class="code-head"><span>Vue SFC</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;!-- frontend/src/features/ordering/OrderDetailView.vue --&gt;
+&lt;script setup lang="ts"&gt;
+const props = defineProps&lt;{ id: string }&gt;()
+const order = ref&lt;Order | null&gt;(null)
+
+onMounted(async () =&gt; {
+  order.value = await orderingApi.get(props.id)   // ← triggers hop 2
+})
+&lt;/script&gt;</code></pre></div>
+
+<h3 id="read-2-http">2. API module → HTTP</h3>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// frontend/src/api/ordering.ts
+get: (id: string) =&gt; get&lt;Order&gt;(`/api/orders/${id}`)</code></pre></div>
+<p>The request goes to <code>http://localhost:5173/api/orders/…</code>, and Vite's dev proxy forwards it to Spring Boot on <code>:8080</code>. In production the built Vue app is usually served from the same origin as the API, so the relative URL keeps working.</p>
+
+<h3 id="read-3-controller">3. Controller (web adapter)</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/web/OrderController.java
+@GetMapping("/{id}")
+OrderView get(@PathVariable UUID id) {
+    return orders.get(id);
+}</code></pre></div>
+<p>The controller's only job is to translate between HTTP and Java. It contains no logic.</p>
+
+<h3 id="read-4-app">4. Application service opens a transaction</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/application/OrderApplicationService.java
+@Transactional(readOnly = true)
+public OrderView get(UUID orderId) {
+    return OrderView.from(load(orderId));
+}</code></pre></div>
+<p>The <code>readOnly = true</code> lets Hibernate skip dirty checking, and some databases route read-only transactions to replicas. Note that <code>OrderView.from(...)</code> runs <em>inside</em> the transaction. Because of that, any lazy associations can still be loaded, and <code>spring.jpa.open-in-view=false</code> is safe.</p>
+
+<h3 id="read-5-repo">5. Repository → Hibernate → SQL</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/infrastructure/JpaOrderRepository.java  (implements domain port OrderRepository)
+public Optional&lt;Order&gt; findById(OrderId id) {
+    return jpa.findById(id.value());   // Spring Data → EntityManager.find(Order.class, uuid)
+}</code></pre></div>
+
+<div class="code"><div class="code-head"><span>SQL</span><button class="copy" type="button">Copy</button></div><pre><code class="language-sql">-- what Hibernate actually executes (set logging.level.org.hibernate.SQL=DEBUG to see it)
+select o.id, o.created_at, o.customer_email, o.placed_at, o.status, o.version
+  from ordering_order o where o.id = ?;
+select l.order_id, l.id, l.product_id, l.product_name, l.quantity,
+       l.unit_price_amount, l.unit_price_currency
+  from ordering_order_line l where l.order_id = ? order by l.product_name;</code></pre></div>
+
+<h3 id="read-6-hydrate">6. Rows → aggregate</h3>
+<p>Hibernate instantiates <code>Order</code> through its protected no-arg constructor and sets the private fields reflectively. It builds the <code>Money</code> embeddable from <code>unit_price_amount</code> and <code>unit_price_currency</code>. No setters run and no validation runs. Hibernate is <em>reconstituting</em> an object that was valid when it was saved.</p>
+
+<h3 id="read-7-view">7. Aggregate → read model → JSON → screen</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/application/OrderView.java
+static OrderView from(Order o) {
+    return new OrderView(o.id().value(), o.customerEmail().value(), o.status().name(),
+            o.lines().stream().map(LineView::from).toList(),
+            o.total().amount(), o.total().currency(),     // total() is computed by the domain
+            o.createdAt(), o.placedAt(), o.version());
+}</code></pre></div>
+
+<div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">{
+  "id": "7f3c0b9e-…",
+  "customerEmail": "ada@example.com",
+  "status": "DRAFT",
+  "lines": [{ "productId": "1111…0001", "productName": "Domain-Driven Design",
+              "unitPrice": 54.99, "quantity": 2, "lineTotal": 109.98 }],
+  "total": 109.98,
+  "currency": "USD",
+  "createdAt": "2026-11-17T22:41:07.512Z",
+  "placedAt": null,
+  "version": 1
+}</code></pre></div>
+<p>Vue assigns the JSON to <code>order.value</code>, and the template re-renders. Note that the <em>backend</em> calculated <code>total</code>. The frontend never repeats business calculations, because if it did, the two copies of the rule would eventually disagree.</p>
+
+<h2 id="write-path">Write path: clicking "Place order"</h2>
+
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant V as Vue (OrderDetailView)
+  participant C as OrderController
+  participant S as OrderApplicationService
+  participant R as OrderRepository
+  participant O as Order (aggregate)
+  participant T as IntegrationEventTranslator
+  participant H as Catalog StockReservationHandler
+  participant DB as Database
+  V-&gt;&gt;C: POST /api/orders/{id}/place
+  C-&gt;&gt;S: place(id)
+  Note over S: @Transactional begins
+  S-&gt;&gt;R: findById(id)
+  R-&gt;&gt;DB: SELECT order + lines
+  S-&gt;&gt;O: place(clock)
+  O-&gt;&gt;O: check DRAFT &amp; non-empty&lt;br/&gt;status = PLACED&lt;br/&gt;register OrderPlaced
+  S-&gt;&gt;R: save(order)
+  S-&gt;&gt;T: publish OrderPlaced (sync)
+  T-&gt;&gt;H: publish OrderPlacedIntegrationEvent (sync)
+  H-&gt;&gt;DB: SELECT product, then product.reserve(qty)
+  alt enough stock
+    Note over S: commit → UPDATE order, UPDATE products
+    S--&gt;&gt;C: OrderView (status PLACED)
+    C--&gt;&gt;V: 200 JSON
+  else insufficient stock
+    H--&gt;&gt;S: DomainException
+    Note over S: rollback — order stays DRAFT
+    C--&gt;&gt;V: 409 application/problem+json
+  end
+</pre>
+
+<p>The important properties:</p>
+<ul>
+  <li><strong>The rule lives in one place.</strong> <code>Order.place()</code> decides whether placing is legal. The Vue button is only a hint, and it can be shown or hidden based on <code>status</code>.</li>
+  <li><strong>One transaction per command.</strong> Either everything (the order status and the stock of every product) commits, or nothing does.</li>
+  <li><strong>No explicit UPDATE.</strong> Hibernate's <em>dirty checking</em> compares the loaded state to the current state when the transaction commits, and writes only the columns that changed. It also increments <code>version</code> for optimistic locking.</li>
+  <li><strong>The response is the new state.</strong> The controller returns the updated <code>OrderView</code>, so Vue swaps its copy without making another GET request.</li>
+</ul>
+
+<h2 id="errors">How errors reach the screen</h2>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Domain throws a plain exception, knowing nothing about HTTP
+throw new DomainException("Cannot place an empty order");</code></pre></div>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// config/GlobalExceptionHandler.java maps it to RFC 9457 problem+json
+@ExceptionHandler(DomainException.class)
+ProblemDetail ruleViolated(DomainException ex) {
+    return problem(HttpStatus.CONFLICT, "business-rule", "Business rule violated", ex.getMessage());
+}</code></pre></div>
+
+<div class="code"><div class="code-head"><span>HTTP</span><button class="copy" type="button">Copy</button></div><pre><code class="language-http">HTTP/1.1 409 Conflict
+Content-Type: application/problem+json
+
+{"type":"https://example.com/problems/business-rule","title":"Business rule violated",
+ "status":409,"detail":"Cannot place an empty order","instance":"/api/orders/…/place"}</code></pre></div>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// frontend/src/api/http.ts turns it into ApiError; useAsync exposes error.value
+if (!res.ok) throw new ApiError(await res.json())</code></pre></div>
+<p>The message the user sees is the same one written in the domain class. That way the ubiquitous language reaches the UI too.</p>
+
+<h2 id="why-not-entities">Why not return the entity directly?</h2>
+<p>Spring would happily serialize <code>Order</code> to JSON. Don't let it. Here's why:</p>
+<div class="compare">
+  <div class="bad"><h4>Returning entities</h4>
+    <ul>
+      <li>The API contract changes whenever the domain model changes.</li>
+      <li>Lazy collections throw <code>LazyInitializationException</code> during serialization, or trigger surprise queries.</li>
+      <li>Bidirectional relations cause infinite recursion.</li>
+      <li>Internal fields leak out (version, flags).</li>
+      <li>Tempts you to accept entities in <code>@RequestBody</code>, which is mass assignment.</li>
+    </ul>
+  </div>
+  <div class="good"><h4>Returning read models</h4>
+    <ul>
+      <li>The domain can be refactored freely.</li>
+      <li>The shape is designed for the screen (computed totals, flattened names).</li>
+      <li>All loading happens inside the transaction, so there are no lazy surprises.</li>
+      <li>Easy to generate TypeScript types from them via OpenAPI.</li>
+      <li>Request DTOs whitelist exactly what clients may send.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="where-seed-data">Where does the initial data come from?</h2>
+<p>The products you see on first run are inserted by a Flyway migration, <code>backend/src/main/resources/db/migration/V2__seed_catalog.sql</code>. Flyway runs every migration the database hasn't seen yet when the app starts. Hibernate is set to <code>ddl-auto: validate</code>, so it only <em>checks</em> that the entity mappings match the schema that Flyway created. Data you create through the UI is written by the normal path described above. With H2 it disappears on restart. With the <code>postgres</code> profile it persists in the Docker volume.</p>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="index.html"><small>← Previous</small>Start here</a><a class="next" href="ddd-fundamentals.html"><small>Next →</small>DDD fundamentals</a></nav>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

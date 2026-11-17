@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How aggregates announce what happened, how other parts of the system react, and the transaction choices that decide whether you get strong or eventual consistency.">
+<title>Domain &amp; integration events — DDD Spring + Vue Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Spring + Vue Guide</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Start here</a></li>
+<li><a href="data-flow.html">DB to screen: the full data flow</a></li>
+</ol>
+<div class="nav-group">Concepts</div><ol>
+<li><a href="ddd-fundamentals.html">DDD fundamentals</a></li>
+<li><a href="strategic-design.html">Strategic design</a></li>
+<li><a href="tactical-patterns.html">Tactical patterns</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture-styles.html">Architecture styles</a></li>
+<li><a href="project-structure.html">Project structure</a></li>
+</ol>
+<div class="nav-group">Backend</div><ol>
+<li><a href="persistence.html">Persistence with JPA &amp; Hibernate</a></li>
+<li><a href="application-layer.html">Application layer &amp; use cases</a></li>
+<li><a href="domain-events.html" aria-current="page" class="on">Domain &amp; integration events</a></li>
+<li><a href="rest-api.html">REST API design</a></li>
+</ol>
+<div class="nav-group">Frontend</div><ol>
+<li><a href="vue-frontend.html">Vue frontend</a></li>
+</ol>
+<div class="nav-group">Quality &amp; ops</div><ol>
+<li><a href="testing.html">Testing</a></li>
+<li><a href="security-config-deploy.html">Security, config &amp; deployment</a></li>
+</ol>
+<div class="nav-group">Decisions</div><ol>
+<li><a href="decisions.html">Design decisions (ADR log)</a></li>
+<li><a href="make-it-yours.html">Starting your own app</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="sample-walkthrough.html">Sample app tour</a></li>
+<li><a href="glossary.html">Glossary</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Backend</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Backend</span>
+          <h1>Domain &amp; integration events</h1>
+          <p class="lede">How aggregates announce what happened, how other parts of the system react, and the transaction choices that decide whether you get strong or eventual consistency.</p>
+        </header>
+        <h2 id="two-kinds">Two kinds of events</h2>
+<table>
+  <thead><tr><th></th><th>Domain event</th><th>Integration event</th></tr></thead>
+  <tbody>
+    <tr><td>Audience</td><td>The same bounded context</td><td>Other contexts / services</td></tr>
+    <tr><td>Types used</td><td>Rich domain types (<code>OrderId</code>, <code>Money</code>)</td><td>Primitives only (<code>UUID</code>, <code>int</code>, <code>String</code>)</td></tr>
+    <tr><td>Stability</td><td>Can change whenever the model changes</td><td>A contract; version it carefully</td></tr>
+    <tr><td>Example</td><td><code>ordering.domain.events.OrderPlaced</code></td><td><code>integration.OrderPlacedIntegrationEvent</code></td></tr>
+    <tr><td>Transport (monolith)</td><td>Spring <code>ApplicationEventPublisher</code></td><td>Spring events today; Kafka/RabbitMQ when split</td></tr>
+  </tbody>
+</table>
+
+<h2 id="flow">The event flow in this template</h2>
+
+<pre class="mermaid">
+sequenceDiagram
+  participant App as OrderApplicationService
+  participant O as Order
+  participant Bus as Spring event bus
+  participant Tr as IntegrationEventTranslator (ordering)
+  participant H as StockReservationHandler (catalog)
+  App-&gt;&gt;O: place(clock)
+  O--&gt;&gt;O: registerEvent(OrderPlaced)
+  App-&gt;&gt;App: orders.save(order)
+  App-&gt;&gt;O: pullDomainEvents()
+  App-&gt;&gt;Bus: publishEvent(OrderPlaced)
+  Bus-&gt;&gt;Tr: on(OrderPlaced)
+  Tr-&gt;&gt;Bus: publishEvent(OrderPlacedIntegrationEvent)
+  Bus-&gt;&gt;H: on(OrderPlacedIntegrationEvent)
+  H-&gt;&gt;H: catalog.reserveStock(...) per line
+  Note over App,H: all synchronous, same thread, same transaction
+</pre>
+
+<h3 id="registering">1. The aggregate registers</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public void place(Clock clock) {
+    …
+    this.status = OrderStatus.PLACED;
+    registerEvent(new OrderPlaced(id(), snapshotLines(), total(), placedAt));
+}</code></pre></div>
+<p>The aggregate doesn't publish anything itself. It has no reference to a publisher, which keeps it pure and easy to unit test (<code>order.peekDomainEvents()</code>).</p>
+
+<h3 id="publishing">2. The application service publishes</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">Order saved = orders.save(order);
+order.pullDomainEvents().forEach(events::publishEvent);</code></pre></div>
+
+<div class="callout"><span class="label">Alternative: Spring Data @DomainEvents</span>
+<p>Spring Data can publish events automatically on <code>save()</code> if the aggregate extends <code>AbstractAggregateRoot</code> (or has a <code>@DomainEvents</code> method). That takes less code, but it couples the domain to Spring Data, and it only fires when you call <code>save()</code> explicitly, not on dirty-checked updates. The template publishes explicitly so the behaviour is visible.</p></div>
+
+<h3 id="translating">3. Translate to the published language</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Component
+class IntegrationEventTranslator {
+    @EventListener
+    void on(OrderPlaced e) {
+        publisher.publishEvent(new OrderPlacedIntegrationEvent(e.orderId().value(), toLines(e.lines())));
+    }
+}</code></pre></div>
+
+<h3 id="handling">4. Another context reacts</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Component
+class StockReservationHandler {          // in catalog.application — depends only on integration.*
+    @EventListener
+    void on(OrderPlacedIntegrationEvent event) {
+        event.lines().forEach(l -&gt; catalog.reserveStock(l.productId(), l.quantity()));
+    }
+}</code></pre></div>
+
+<h2 id="listener-phases">The critical choice: when does the listener run?</h2>
+<table>
+  <thead><tr><th>Annotation</th><th>Runs</th><th>Failure in listener</th><th>Consistency</th></tr></thead>
+  <tbody>
+    <tr><td><code>@EventListener</code> (template)</td><td>Immediately, in the publisher's transaction</td><td>Rolls back the whole command</td><td>Strong (atomic)</td></tr>
+    <tr><td><code>@TransactionalEventListener(phase = BEFORE_COMMIT)</code></td><td>Just before commit, same transaction</td><td>Rolls back the whole command</td><td>Strong</td></tr>
+    <tr><td><code>@TransactionalEventListener</code> (default <code>AFTER_COMMIT</code>)</td><td>After a successful commit</td><td>Original change is already committed; the listener's work is lost unless you retry</td><td>Eventual (and fragile without an outbox)</td></tr>
+    <tr><td><code>AFTER_COMMIT</code> + <code>@Async</code></td><td>After commit, on another thread</td><td>Same as above, and the caller doesn't wait</td><td>Eventual</td></tr>
+    <tr><td><code>AFTER_ROLLBACK</code> / <code>AFTER_COMPLETION</code></td><td>After rollback / either</td><td>—</td><td>For compensations/cleanup</td></tr>
+  </tbody>
+</table>
+
+<h3 id="why-sync">Why the template uses synchronous listeners for stock</h3>
+<p>The business rule is "never oversell". With a synchronous listener, a failed reservation throws <code>DomainException</code> and the order stays <code>DRAFT</code>, with no partial state and no compensation logic. The integration test <code>overselling_rolls_back_the_whole_placement</code> proves it. The cost is that the two aggregates are locked together for the length of one transaction, which is fine in a monolith with moderate load.</p>
+
+<h3 id="after-commit">When to use AFTER_COMMIT</h3>
+<p>Use it for side effects that shouldn't happen if the transaction rolls back, and whose failure shouldn't undo the business action:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Component
+class OrderConfirmationEmailer {
+    @TransactionalEventListener            // AFTER_COMMIT: never email about an order that rolled back
+    @Async                                 // don't make the user wait for SMTP
+    void on(OrderPlaced e) {
+        mailer.sendConfirmation(e.orderId());
+    }
+}</code></pre></div>
+<div class="callout warn"><span class="label">Gotcha</span>
+<p>Inside an <code>AFTER_COMMIT</code> listener, the original transaction is finished. If the listener writes to the database, annotate its service method with <code>@Transactional(propagation = REQUIRES_NEW)</code>. Otherwise the writes are silently never committed.</p></div>
+
+<h2 id="outbox">The transactional outbox</h2>
+<p>When events must leave the process (Kafka, RabbitMQ, a webhook), this naive code is broken:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Transactional
+public void place(UUID id) {
+    order.place(clock);
+    orders.save(order);
+    kafka.send("orders", event);   // ❌ sent, then DB commit fails → consumers see a phantom order
+}                                   // ❌ or: DB commits, then the app crashes before send → event lost</code></pre></div>
+<p>The <strong>outbox pattern</strong> writes the event to an <code>outbox</code> table <em>in the same transaction</em> as the business change. A separate relay process reads the table and publishes, retrying until it succeeds. That gives at-least-once delivery, so consumers must be idempotent.</p>
+
+<pre class="mermaid">
+flowchart LR
+  A[Application service] -- "same TX" --&gt; T1[(ordering_order)]
+  A -- "same TX" --&gt; T2[(outbox)]
+  R[Relay / poller&lt;br/&gt;or Debezium CDC] -- reads --&gt; T2
+  R -- publishes --&gt; K[[Kafka topic]]
+  K --&gt; C[Consumer&lt;br/&gt;idempotent]
+</pre>
+
+<div class="code"><div class="code-head"><span>SQL</span><button class="copy" type="button">Copy</button></div><pre><code class="language-sql">CREATE TABLE outbox (
+    id            UUID PRIMARY KEY,
+    aggregate_id  UUID NOT NULL,
+    type          VARCHAR(200) NOT NULL,
+    payload       JSONB NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL,
+    published_at  TIMESTAMPTZ
+);</code></pre></div>
+
+<p>Options for implementing it:</p>
+<ul>
+  <li><strong>Spring Modulith's Event Publication Registry</strong> records <code>@ApplicationModuleListener</code> events in a table and republishes incomplete ones on restart. It's the least effort if you adopt Modulith, and it also externalizes events to Kafka/AMQP with <code>@Externalized</code>.</li>
+  <li><strong>Hand-rolled</strong>: an <code>OutboxWriter</code> listener with <code>BEFORE_COMMIT</code> that inserts rows, plus a <code>@Scheduled</code> poller that publishes and marks them sent.</li>
+  <li><strong>Debezium CDC</strong>: tails the database's write-ahead log and publishes outbox rows. This scales best, but it's another piece of infrastructure.</li>
+</ul>
+
+<h2 id="eventual-consistency">Going eventually consistent: what changes</h2>
+<p>If stock reservation became asynchronous, the model would need new states, because "placed" no longer means "stock guaranteed":</p>
+
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --&gt; DRAFT
+  DRAFT --&gt; PENDING_STOCK: place()
+  PENDING_STOCK --&gt; CONFIRMED: StockReserved
+  PENDING_STOCK --&gt; REJECTED: StockReservationFailed
+  CONFIRMED --&gt; SHIPPED: ship()
+  CONFIRMED --&gt; CANCELLED: cancel() → StockReleased
+  DRAFT --&gt; CANCELLED: cancel()
+</pre>
+<p>This is a small <strong>saga</strong> (a process manager): a sequence of local transactions linked by events, with compensating actions on failure. It's more robust at scale and across services, but it is noticeably more complex for both the code and the UI (which now shows "pending" states). Make that trade-off deliberately.</p>
+
+<h2 id="event-design">Designing good events</h2>
+<ul>
+  <li><strong>Past tense, business language</strong>: <code>OrderPlaced</code>, not <code>OrderStatusChangedToTwo</code>.</li>
+  <li><strong>Immutable records</strong> with an <code>occurredAt</code> timestamp.</li>
+  <li><strong>Enough data to act without calling back</strong> (the lines and quantities here). It shouldn't be the whole aggregate, though.</li>
+  <li><strong>Integration events: add fields, never remove or rename them.</strong> If you must break the contract, publish <code>OrderPlacedV2</code> alongside the old event for a while.</li>
+  <li><strong>Consumers are idempotent</strong>. Store processed event IDs, or make the operation naturally idempotent.</li>
+</ul>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="application-layer.html"><small>← Previous</small>Application layer &amp; use cases</a><a class="next" href="rest-api.html"><small>Next →</small>REST API design</a></nav>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

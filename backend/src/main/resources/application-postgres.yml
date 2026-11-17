@@ -1,0 +1,10 @@
+# Activate with: ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+# Start the database with: docker compose up -d   (from the repo root)
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/shop
+    username: shop
+    password: shop
+  h2:
+    console:
+      enabled: false

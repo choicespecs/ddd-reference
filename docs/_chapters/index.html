@@ -1,0 +1,129 @@
+---
+title: Start here
+lede: A working Spring Boot + Vue template built the domain-driven way, with the reasoning behind every choice so you can make your own.
+---
+
+<h2 id="what-this-is">What this repository is</h2>
+<p>This repo has two parts that go together:</p>
+<ol>
+  <li><strong>A small working app</strong>: a shop with two <em>bounded contexts</em> (Catalog and Ordering). It has a Spring Boot 3 backend (Java 17, JPA/Hibernate, Flyway, H2 or PostgreSQL) and a Vue 3 + TypeScript frontend. It is small enough to read in an afternoon but uses every pattern you'll need in a real domain-driven app: aggregates, value objects, repositories, domain events, an anti-corruption layer, and architecture tests.</li>
+  <li><strong>This guide</strong>: what DDD is, which architecture choices you have, which ones the template makes and why, and how to adapt it for your own app.</li>
+</ol>
+
+<div class="callout tip"><span class="label">How to use it</span>
+<p>Read <a href="data-flow.html">DB to screen</a> first. It traces one click from the Vue button down to the SQL row and back, which ties all the other chapters together. Then read the concept chapters in order, keeping the code open next to the guide. Every pattern links to the class that implements it.</p></div>
+
+<h2 id="the-big-picture">The big picture</h2>
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    V[Vue 3 app<br/>features/catalog<br/>features/ordering]
+  end
+  subgraph SpringBoot["Spring Boot (one deployable)"]
+    direction TB
+    subgraph Catalog["Catalog context"]
+      CW[web] --> CA[application] --> CD[domain]
+      CI[infrastructure] -.implements.-> CD
+    end
+    subgraph Ordering["Ordering context"]
+      OW[web] --> OA[application] --> OD[domain]
+      OI[infrastructure] -.implements.-> OD
+      OI -.implements.-> OA
+    end
+    OI -- "ACL: CatalogAdapter" --> CA
+    OA -- "integration events" --> CA
+  end
+  DB[(PostgreSQL / H2<br/>Flyway-managed)]
+  V -- "JSON over /api" --> CW
+  V -- "JSON over /api" --> OW
+  CI --> DB
+  OI --> DB
+```
+
+<p>Read the diagram from left to right. The browser only ever sees JSON. Each bounded context is a vertical slice with four layers. Dependencies point <em>inward</em> toward the domain. The two contexts talk to each other through only two narrow, deliberate channels.</p>
+
+<h2 id="run-it">Run it in two minutes</h2>
+
+```bash
+# Terminal 1 — backend on :8080 (in-memory H2, seeded with demo products)
+cd backend
+./mvnw spring-boot:run
+
+# Terminal 2 — frontend on :5173 (proxies /api to :8080)
+cd frontend
+npm install
+npm run dev
+```
+
+<p>Open <code>http://localhost:5173</code>. Other useful URLs:</p>
+<table>
+  <thead><tr><th>URL</th><th>What</th></tr></thead>
+  <tbody>
+    <tr><td><code>http://localhost:8080/swagger-ui.html</code></td><td>Interactive OpenAPI docs for every endpoint</td></tr>
+    <tr><td><code>http://localhost:8080/h2-console</code></td><td>Browse the database (JDBC URL <code>jdbc:h2:mem:shop</code>, user <code>sa</code>, empty password)</td></tr>
+    <tr><td><code>http://localhost:8080/actuator/health</code></td><td>Health check</td></tr>
+  </tbody>
+</table>
+<p>To use PostgreSQL instead, run <code>docker compose up -d</code> at the repo root, then <code>./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres</code>.</p>
+
+<h2 id="things-to-try">Things to try in the UI</h2>
+<ul>
+  <li>Start an order and click <strong>Place order</strong> with no lines. The domain rule "Cannot place an empty order" comes back as an error message.</li>
+  <li>Order 5 sticker packs (only 2 are in stock) and place the order. The Catalog context rejects the reservation, and the <em>whole</em> placement rolls back, so the order stays <code>DRAFT</code>.</li>
+  <li>Place an order, check stock in the Catalog, then cancel the order. The stock comes back through an <code>OrderCancelled</code> event.</li>
+  <li>Change a product's price after ordering it. The order keeps the old price, because order lines hold a <em>snapshot</em>.</li>
+</ul>
+
+<h2 id="map">Map of the guide</h2>
+<div class="cards">
+  <a class="card" href="data-flow.html"><strong>DB to screen</strong><span>One request traced through every layer. Read this first.</span></a>
+  <a class="card" href="ddd-fundamentals.html"><strong>DDD fundamentals</strong><span>What DDD is, ubiquitous language, when it pays off.</span></a>
+  <a class="card" href="strategic-design.html"><strong>Strategic design</strong><span>Subdomains, bounded contexts, context maps.</span></a>
+  <a class="card" href="tactical-patterns.html"><strong>Tactical patterns</strong><span>Entities, value objects, aggregates, repositories, services.</span></a>
+  <a class="card" href="architecture-styles.html"><strong>Architecture styles</strong><span>Layered vs hexagonal vs onion vs clean; monolith vs microservices.</span></a>
+  <a class="card" href="project-structure.html"><strong>Project structure</strong><span>Package layout, dependency rules, ArchUnit enforcement.</span></a>
+  <a class="card" href="persistence.html"><strong>Persistence</strong><span>JPA/Hibernate mapping for aggregates, Flyway, locking, N+1.</span></a>
+  <a class="card" href="application-layer.html"><strong>Application layer</strong><span>Use cases, transactions, commands, read models.</span></a>
+  <a class="card" href="domain-events.html"><strong>Events</strong><span>Domain vs integration events, transaction phases, outbox.</span></a>
+  <a class="card" href="rest-api.html"><strong>REST API</strong><span>Task-based endpoints, validation, ProblemDetail errors.</span></a>
+  <a class="card" href="vue-frontend.html"><strong>Vue frontend</strong><span>Structure, API client, state, forms, types from OpenAPI.</span></a>
+  <a class="card" href="testing.html"><strong>Testing</strong><span>Domain unit tests, slices, Testcontainers, ArchUnit.</span></a>
+  <a class="card" href="security-config-deploy.html"><strong>Security & deploy</strong><span>Spring Security, profiles, Docker, serving Vue.</span></a>
+  <a class="card" href="decisions.html"><strong>Decision log</strong><span>Every choice, the alternatives, and when to change it.</span></a>
+  <a class="card" href="make-it-yours.html"><strong>Make it yours</strong><span>Step-by-step: from domain discovery to your first aggregate.</span></a>
+  <a class="card" href="sample-walkthrough.html"><strong>Sample app tour</strong><span>File map, API cookbook with curl, things to extend.</span></a>
+</div>
+
+<h2 id="repo-layout">Repository layout</h2>
+<div class="tree">ddd-spring-vue-template/
+├── backend/                 Spring Boot app (Maven, Java 17)
+│   ├── pom.xml
+│   └── src/
+│       ├── main/java/com/example/shop/
+│       │   ├── sharedkernel/    Money, AggregateRoot, DomainException…
+│       │   ├── integration/     events shared between contexts
+│       │   ├── catalog/         bounded context: domain/ application/ infrastructure/ web/
+│       │   ├── ordering/        bounded context: domain/ application/ infrastructure/ web/
+│       │   └── config/          cross-cutting Spring config (errors, CORS, Clock)
+│       ├── main/resources/
+│       │   ├── application.yml, application-postgres.yml
+│       │   └── db/migration/    Flyway V1__, V2__ …
+│       └── test/java/…          domain unit tests, API test, ArchUnit rules
+├── frontend/                Vue 3 + Vite + TypeScript
+│   └── src/
+│       ├── api/             http client + one module per context
+│       ├── composables/     useAsync
+│       └── features/        catalog/  ordering/   (mirrors backend contexts)
+├── docs/                    this guide (build.py + _chapters/ → *.html)
+└── docker-compose.yml       PostgreSQL for the postgres profile</div>
+
+<h2 id="editing-the-guide">Editing this guide</h2>
+<p>The guide pages are generated, so you can add your own project's decisions to them. Chapter sources are HTML fragments in <code>docs/_chapters/</code>. Code blocks inside them use triple-backtick fences, and the build escapes them for you. To rebuild:</p>
+
+```bash
+python3 docs/build.py     # regenerates docs/*.html and the search index
+open docs/index.html      # plain files; no server needed
+```
+
+<p>To add a page, create <code>docs/_chapters/my-page.html</code> with a <code>title:</code>/<code>lede:</code> front-matter block, add it to <code>CHAPTERS</code> in <code>build.py</code>, and rebuild.</p>

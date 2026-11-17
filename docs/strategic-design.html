@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Before you write a single entity, decide where the boundaries are. This is the most valuable and least reversible part of DDD.">
+<title>Strategic design — DDD Spring + Vue Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Spring + Vue Guide</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Start here</a></li>
+<li><a href="data-flow.html">DB to screen: the full data flow</a></li>
+</ol>
+<div class="nav-group">Concepts</div><ol>
+<li><a href="ddd-fundamentals.html">DDD fundamentals</a></li>
+<li><a href="strategic-design.html" aria-current="page" class="on">Strategic design</a></li>
+<li><a href="tactical-patterns.html">Tactical patterns</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture-styles.html">Architecture styles</a></li>
+<li><a href="project-structure.html">Project structure</a></li>
+</ol>
+<div class="nav-group">Backend</div><ol>
+<li><a href="persistence.html">Persistence with JPA &amp; Hibernate</a></li>
+<li><a href="application-layer.html">Application layer &amp; use cases</a></li>
+<li><a href="domain-events.html">Domain &amp; integration events</a></li>
+<li><a href="rest-api.html">REST API design</a></li>
+</ol>
+<div class="nav-group">Frontend</div><ol>
+<li><a href="vue-frontend.html">Vue frontend</a></li>
+</ol>
+<div class="nav-group">Quality &amp; ops</div><ol>
+<li><a href="testing.html">Testing</a></li>
+<li><a href="security-config-deploy.html">Security, config &amp; deployment</a></li>
+</ol>
+<div class="nav-group">Decisions</div><ol>
+<li><a href="decisions.html">Design decisions (ADR log)</a></li>
+<li><a href="make-it-yours.html">Starting your own app</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="sample-walkthrough.html">Sample app tour</a></li>
+<li><a href="glossary.html">Glossary</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Concepts</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Concepts</span>
+          <h1>Strategic design</h1>
+          <p class="lede">Before you write a single entity, decide where the boundaries are. This is the most valuable and least reversible part of DDD.</p>
+        </header>
+        <h2 id="subdomains">Subdomains: what the business does</h2>
+<p>A <strong>subdomain</strong> is an area of the business. You <em>discover</em> subdomains, you don't design them. Classify each one, because the classification tells you how much effort to put in:</p>
+<table>
+  <thead><tr><th>Type</th><th>Meaning</th><th>Strategy</th><th>Example (a shop)</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Core</strong></td><td>What makes this business different from competitors. Complex and valuable.</td><td>Build in-house, with your best people, a rich domain model, and full DDD.</td><td>Ordering &amp; fulfilment rules, pricing/promotions</td></tr>
+    <tr><td><strong>Supporting</strong></td><td>Needed and somewhat specific to you, but not a differentiator.</td><td>Build simply (CRUD is often fine) or outsource.</td><td>Catalog management, inventory</td></tr>
+    <tr><td><strong>Generic</strong></td><td>Every business has it, and it's a solved problem.</td><td>Buy or use off-the-shelf.</td><td>Authentication (Keycloak/Okta), payments (Stripe), email</td></tr>
+  </tbody>
+</table>
+
+<h2 id="bounded-contexts">Bounded contexts: where a model applies</h2>
+<p>A <strong>bounded context</strong> is a boundary inside which every term has exactly one meaning and one model. It's a <em>solution-space</em> boundary: a chunk of software with its own model, its own code, and usually its own tables.</p>
+<p>The classic example is the word "Product":</p>
+<table>
+  <thead><tr><th>Context</th><th>What "Product" means there</th><th>Attributes it cares about</th></tr></thead>
+  <tbody>
+    <tr><td>Catalog</td><td>Something we sell</td><td>SKU, name, description, price, stock on hand, active</td></tr>
+    <tr><td>Ordering</td><td>A line on an order (not even called Product: it's an <code>OrderLine</code>)</td><td>productId, name <em>at the time of ordering</em>, unit price <em>at the time of ordering</em>, quantity</td></tr>
+    <tr><td>Shipping (future)</td><td>A parcel to pack</td><td>Weight, dimensions, hazardous flag</td></tr>
+  </tbody>
+</table>
+<p>Trying to build one <code>Product</code> class with every attribute for every context creates the "big ball of mud": every change risks breaking an unrelated feature, and nobody can reason about the whole thing. Bounded contexts let each model stay small and focused.</p>
+
+<h3 id="finding-boundaries">Heuristics for finding boundaries</h3>
+<ul>
+  <li><strong>Language changes.</strong> When the same word means something different, or different words mean the same thing, you've probably crossed a boundary.</li>
+  <li><strong>Different experts.</strong> The warehouse manager and the marketing manager each own different contexts.</li>
+  <li><strong>Different rates of change.</strong> Pricing rules change weekly and customer addresses almost never. Keep them apart.</li>
+  <li><strong>Business capabilities</strong>, not data. "Place orders" is a capability; the "orders table" is not a boundary.</li>
+  <li><strong>Transactional needs.</strong> Things that must be consistent <em>immediately</em> usually belong together. Things that can be consistent <em>eventually</em> can be split.</li>
+</ul>
+
+<div class="callout"><span class="label">Bounded context ≠ microservice</span>
+<p>A bounded context is a <em>logical</em> boundary. You can deploy several contexts in one Spring Boot app (a <strong>modular monolith</strong>, which is what this template does) and split them out later if you need to. Going the other way, from a microservice per entity to sensible contexts, is far more painful. See <a href="architecture-styles.html#monolith-vs-microservices">Monolith vs microservices</a>.</p></div>
+
+<h2 id="this-template">The contexts in this template</h2>
+
+<pre class="mermaid">
+flowchart LR
+  subgraph Catalog["Catalog (supporting) — upstream"]
+    P[Product aggregate]
+    CS[CatalogService&lt;br/&gt;= public API]
+  end
+  subgraph Ordering["Ordering (core) — downstream"]
+    O[Order aggregate]
+    ACL[CatalogAdapter&lt;br/&gt;anti-corruption layer]
+    TR[IntegrationEventTranslator]
+  end
+  subgraph Integration["integration (published language)"]
+    E1[OrderPlacedIntegrationEvent]
+    E2[OrderCancelledIntegrationEvent]
+  end
+  SK[["sharedkernel&lt;br/&gt;Money, AggregateRoot,&lt;br/&gt;DomainException"]]
+  ACL -- "query: price, name, availability" --&gt; CS
+  TR -- publishes --&gt; E1 &amp; E2
+  E1 &amp; E2 -- consumed by --&gt; CS
+  Catalog -.uses.-&gt; SK
+  Ordering -.uses.-&gt; SK
+</pre>
+
+<ul>
+  <li><strong>Catalog is upstream</strong>: it doesn't know Ordering exists. ArchUnit enforces this (<code>catalog_does_not_know_ordering</code>).</li>
+  <li><strong>Ordering is downstream</strong>: it needs product data, but gets it only through its own port <code>ProductCatalog</code>. The single class that implements that port, <code>CatalogAdapter</code>, translates Catalog's model into Ordering's.</li>
+  <li><strong>Stock reservation flows the other way</strong> through <em>integration events</em> in a neutral package. That lets Catalog react to orders without depending on Ordering, and without creating a package cycle.</li>
+  <li><strong>The shared kernel</strong> is deliberately tiny: money and a couple of base types.</li>
+</ul>
+
+<h2 id="context-mapping">Context mapping patterns</h2>
+<p>A <strong>context map</strong> describes how bounded contexts (and the teams that own them) relate. These are the patterns you'll use or meet:</p>
+
+<table>
+  <thead><tr><th>Pattern</th><th>What it means</th><th>When to use</th><th>In this repo</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Anti-corruption layer (ACL)</strong></td><td>The downstream context writes a translation layer so the upstream model doesn't leak into its own.</td><td>Integrating with legacy systems, third-party APIs, or any upstream model you don't control or don't like.</td><td><code>ordering.infrastructure.CatalogAdapter</code></td></tr>
+    <tr><td><strong>Published language</strong></td><td>A well-documented shared format for exchanging information (JSON schema, Avro, Protobuf, event classes).</td><td>Events between contexts or services.</td><td><code>com.example.shop.integration</code></td></tr>
+    <tr><td><strong>Open host service (OHS)</strong></td><td>The upstream offers a stable, general-purpose API for all consumers.</td><td>One upstream, many downstreams.</td><td><code>CatalogService</code> + <code>ProductView</code> act as a small one</td></tr>
+    <tr><td><strong>Shared kernel</strong></td><td>Two contexts share a small piece of model code, and changing it requires agreement from both.</td><td>Very stable, truly universal concepts (Money). Keep it tiny.</td><td><code>sharedkernel</code></td></tr>
+    <tr><td><strong>Customer–supplier</strong></td><td>The upstream team plans for the downstream team's needs.</td><td>Teams in the same org with aligned goals.</td><td>Catalog (supplier) → Ordering (customer)</td></tr>
+    <tr><td><strong>Conformist</strong></td><td>The downstream adopts the upstream model as-is.</td><td>The upstream is good enough and you have no leverage (e.g. a big SaaS API).</td><td>—</td></tr>
+    <tr><td><strong>Separate ways</strong></td><td>No integration. Duplicate the little bit you need.</td><td>Integration costs more than duplication.</td><td>—</td></tr>
+    <tr><td><strong>Partnership</strong></td><td>Two teams succeed or fail together and coordinate closely.</td><td>Tightly coupled launches.</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h3 id="acl-example">ACL in code</h3>
+<p>Ordering states what <em>it</em> needs, in its own words:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/application/ProductCatalog.java — a port owned by Ordering
+public interface ProductCatalog {
+    Optional&lt;OrderableProduct&gt; find(UUID productId);
+    record OrderableProduct(UUID productId, String name, Money price, boolean available) {}
+}</code></pre></div>
+<p>The adapter is the <em>only</em> place where Catalog's vocabulary appears:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/infrastructure/CatalogAdapter.java
+@Component
+class CatalogAdapter implements ProductCatalog {
+    private final CatalogService catalog;
+
+    public Optional&lt;OrderableProduct&gt; find(UUID productId) {
+        return catalog.findProduct(productId).map(CatalogAdapter::translate);
+    }
+
+    private static OrderableProduct translate(ProductView p) {
+        // Ordering's idea of "available" combines two Catalog facts
+        boolean available = p.active() &amp;&amp; p.stockOnHand() &gt; 0;
+        return new OrderableProduct(p.id(), p.name(), new Money(p.price(), p.currency()), available);
+    }
+}</code></pre></div>
+<p>If Catalog becomes a separate microservice tomorrow, only this class changes: it would use a <code>RestClient</code> call instead of a method call. <code>Order</code>, <code>OrderApplicationService</code>, and every test of them stay exactly as they are.</p>
+
+<h2 id="event-storming">Event Storming: discovering it all</h2>
+<p><strong>Event Storming</strong> (Alberto Brandolini) is a workshop format for discovering the domain with experts. You need a long wall (or Miro), sticky notes in a few colours, and the right people.</p>
+<table>
+  <thead><tr><th>Sticky</th><th>Colour</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>Domain event (past tense)</td><td>Orange</td><td>Order placed, Stock reserved, Payment captured</td></tr>
+    <tr><td>Command (imperative)</td><td>Blue</td><td>Place order, Cancel order</td></tr>
+    <tr><td>Actor / person</td><td>Small yellow</td><td>Customer, Warehouse clerk</td></tr>
+    <tr><td>Aggregate (handles commands, emits events)</td><td>Large yellow</td><td>Order, Product</td></tr>
+    <tr><td>Policy ("whenever X, then Y")</td><td>Lilac</td><td>Whenever an order is placed, reserve stock</td></tr>
+    <tr><td>Read model (what the user looks at to decide)</td><td>Green</td><td>Product list with stock</td></tr>
+    <tr><td>External system</td><td>Pink</td><td>Payment provider</td></tr>
+    <tr><td>Hotspot / question</td><td>Red</td><td>"What if stock runs out between add-to-cart and place?"</td></tr>
+  </tbody>
+</table>
+<p>The board maps almost directly to code:</p>
+<table>
+  <thead><tr><th>On the wall</th><th>In this template</th></tr></thead>
+  <tbody>
+    <tr><td>Command "Place order"</td><td><code>POST /api/orders/{id}/place</code> → <code>OrderApplicationService.place()</code></td></tr>
+    <tr><td>Aggregate "Order"</td><td><code>ordering.domain.Order</code></td></tr>
+    <tr><td>Event "Order placed"</td><td><code>ordering.domain.events.OrderPlaced</code></td></tr>
+    <tr><td>Policy "reserve stock when order placed"</td><td><code>catalog.application.StockReservationHandler</code></td></tr>
+    <tr><td>Read model "Product list"</td><td><code>ProductView</code>, <code>GET /api/products</code>, <code>ProductListView.vue</code></td></tr>
+  </tbody>
+</table>
+<p>Clusters of stickies that share language and rules become your bounded contexts.</p>
+
+<h2 id="sizing">How big should a context be?</h2>
+<ul>
+  <li><strong>Too big</strong>: the same word starts meaning two things inside it, or two teams keep stepping on each other.</li>
+  <li><strong>Too small</strong>: every use case needs calls across three contexts, or you keep needing distributed transactions.</li>
+  <li><strong>Rule of thumb</strong>: one team can own several contexts, but one context should not be owned by several teams.</li>
+  <li><strong>Start coarse.</strong> It is much cheaper to split a well-modularized context later than to merge two that were split too early.</li>
+</ul>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="ddd-fundamentals.html"><small>← Previous</small>DDD fundamentals</a><a class="next" href="tactical-patterns.html"><small>Next →</small>Tactical patterns</a></nav>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

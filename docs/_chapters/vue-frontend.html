@@ -1,0 +1,208 @@
+---
+title: Vue frontend
+lede: Structuring a Vue 3 + TypeScript app to sit cleanly on top of a domain-driven backend, without re-implementing the domain in the browser.
+---
+
+<h2 id="principles">Principles</h2>
+<ol>
+  <li><strong>The backend owns the rules.</strong> The UI may <em>hint</em> (hide the Place button on a placed order), but it never <em>decides</em>. It sends commands and displays the resulting state or error.</li>
+  <li><strong>Mirror the bounded contexts.</strong> <code>features/catalog</code> and <code>features/ordering</code> match the backend packages, so the language is the same on both sides.</li>
+  <li><strong>One API module per context</strong>, with functions named after the use cases (<code>orderingApi.place(id)</code>).</li>
+  <li><strong>Typed contracts.</strong> TS interfaces mirror the Java read models, and are ideally generated from OpenAPI.</li>
+</ol>
+
+<h2 id="structure">Folder structure</h2>
+<div class="tree">frontend/
+├── index.html
+├── vite.config.ts          dev server :5173, proxy /api → :8080
+├── package.json
+└── src/
+    ├── main.ts             createApp + router
+    ├── router.ts           routes grouped by context, lazy-loaded
+    ├── App.vue             shell: top nav per context
+    ├── style.css
+    ├── format.ts           money(), dateTime()
+    ├── api/
+    │   ├── http.ts         fetch wrapper → ApiError(ProblemDetail)
+    │   ├── types.ts        Product, Order, OrderLine (mirror backend views)
+    │   ├── catalog.ts      catalogApi.list / create / changePrice / receiveStock
+    │   └── ordering.ts     orderingApi.start / addLine / place / cancel …
+    ├── composables/
+    │   └── useAsync.ts     loading / error / data wrapper
+    └── features/
+        ├── catalog/
+        │   ├── ProductListView.vue
+        │   └── NewProductForm.vue
+        └── ordering/
+            ├── OrderListView.vue
+            ├── OrderDetailView.vue
+            └── StatusBadge.vue</div>
+
+<h2 id="api-client">The API client</h2>
+
+```ts
+// src/api/http.ts
+export class ApiError extends Error {
+  constructor(public readonly problem: ProblemDetail) {
+    super(problem.detail ?? problem.title)       // the domain's own message
+  }
+}
+
+export async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, { ...init, headers: { 'Content-Type': 'application/json', ...init.headers } })
+  if (!res.ok) throw new ApiError(await res.json().catch(() => ({ title: res.statusText, status: res.status })))
+  return res.status === 204 ? (undefined as T) : res.json()
+}
+```
+
+```ts
+// src/api/ordering.ts — reads like the application service
+export const orderingApi = {
+  get:     (id: string) => get<Order>(`/api/orders/${id}`),
+  start:   (customerEmail: string) => post<Order>('/api/orders', { customerEmail }),
+  addLine: (id: string, productId: string, quantity: number) =>
+             post<Order>(`/api/orders/${id}/lines`, { productId, quantity }),
+  place:   (id: string) => post<Order>(`/api/orders/${id}/place`),
+  cancel:  (id: string) => post<Order>(`/api/orders/${id}/cancel`),
+}
+```
+<p>Why <code>fetch</code> and not axios? Fewer dependencies, and the wrapper is 20 lines. Axios is a fine choice if you want interceptors (auth token refresh) out of the box.</p>
+
+<h2 id="state">State: composables vs Pinia</h2>
+<p>The template keeps state <strong>local to views</strong> with a small composable:</p>
+
+```ts
+// src/composables/useAsync.ts
+export function useAsync<T, A extends unknown[] = []>(fn: (...args: A) => Promise<T>) {
+  const data = shallowRef<T | null>(null)
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+  async function run(...args: A) {
+    loading.value = true; error.value = null
+    try { return (data.value = await fn(...args)) }
+    catch (e) { error.value = e instanceof ApiError ? e.message : String(e); return null }
+    finally { loading.value = false }
+  }
+  return { data, loading, error, run }
+}
+```
+
+```vue
+<script setup lang="ts">
+const { data: products, loading, error, run: load } = useAsync(() => catalogApi.list())
+onMounted(load)
+</script>
+```
+
+<table>
+  <thead><tr><th>Option</th><th>Good for</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Local refs + composables (template)</td><td>Page-scoped data; most CRUD and workflow screens</td><td>Simplest; data is refetched on navigation</td></tr>
+    <tr><td><strong>Pinia</strong></td><td>State shared across many components/routes: current user, cart, feature flags</td><td>The official Vue store; devtools support</td></tr>
+    <tr><td><strong>TanStack Query (vue-query)</strong></td><td>Server-state caching, background refetch, deduplication, pagination</td><td>Excellent when many screens show the same server data</td></tr>
+  </tbody>
+</table>
+
+```ts
+// If you add Pinia — a store per context, actions call the API module
+export const useCartStore = defineStore('cart', () => {
+  const order = ref<Order | null>(null)
+  const itemCount = computed(() => order.value?.lines.reduce((n, l) => n + l.quantity, 0) ?? 0)
+  async function add(productId: string) {
+    order.value ??= await orderingApi.start(currentUser.email)
+    order.value = await orderingApi.addLine(order.value.id, productId, 1)
+  }
+  return { order, itemCount, add }
+})
+```
+<div class="callout warn"><span class="label">Don't mirror the aggregate in the store</span>
+<p>A store that recomputes totals or checks "can this be placed?" duplicates the domain, and the two copies will drift. Store the server's <code>OrderView</code> as-is and replace it with whatever the next command returns.</p></div>
+
+<h2 id="commands-in-ui">Sending commands, rendering results</h2>
+
+```ts
+// OrderDetailView.vue — every command returns the new OrderView; just swap it in
+const { loading, error, run: exec } = useAsync(async (command: () => Promise<Order>) => {
+  order.value = await command()
+})
+const place  = () => exec(() => orderingApi.place(props.id))
+const cancel = () => exec(() => orderingApi.cancel(props.id))
+```
+
+```vue
+<button v-if="order.status === 'DRAFT'" :disabled="loading" @click="place">Place order</button>
+<p v-if="error" class="error">{{ error }}</p>   <!-- e.g. "Cannot place an empty order" -->
+```
+
+<h3 id="allowed-actions">Better: let the server say which actions are allowed</h3>
+<p>The <code>v-if="order.status === 'DRAFT'"</code> check repeats a small piece of domain knowledge in the UI. For complex state machines, have the read model include the allowed actions:</p>
+
+```java
+// backend
+public record OrderView(…, Set<String> allowedActions) {}
+// built from the aggregate: order.canPlace(), order.canCancel() …
+```
+
+```vue
+<button v-if="order.allowedActions.includes('place')" @click="place">Place order</button>
+```
+
+<h2 id="forms">Forms and validation</h2>
+<ul>
+  <li>Use HTML attributes (<code>required</code>, <code>min</code>, <code>type="email"</code>) for instant feedback.</li>
+  <li>Show server ProblemDetail messages for everything else. They come from the domain and are already user-readable.</li>
+  <li>For field-level server errors, extend <code>GlobalExceptionHandler</code> to add an <code>errors: { field: message }</code> property to the ProblemDetail for 400s, then map those messages next to the matching inputs.</li>
+  <li>For complex forms, libraries such as VeeValidate + Zod give schema-driven client validation.</li>
+</ul>
+
+<h2 id="types">Keeping TypeScript types in sync</h2>
+
+```bash
+npm i -D openapi-typescript
+npx openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts
+```
+
+```ts
+import type { components } from './schema'
+export type Order = components['schemas']['OrderView']
+export type Product = components['schemas']['ProductView']
+```
+<p>Add this as an npm script (<code>"gen:api"</code>) and run it in CI. That way a backend change that breaks the frontend fails the build instead of failing in production.</p>
+
+<h2 id="dev-proxy">Dev server and the proxy</h2>
+
+```ts
+// vite.config.ts
+server: { port: 5173, proxy: { '/api': 'http://localhost:8080' } }
+```
+<p>In the browser everything is same-origin (<code>:5173</code>), so there are no CORS preflights and no cookie headaches. The backend also has a CORS config (<code>WebConfig</code>) for when you point the frontend at the API by absolute URL.</p>
+
+<h2 id="deploy-options">Production: two ways to ship the frontend</h2>
+<table>
+  <thead><tr><th></th><th>A. Spring Boot serves the built Vue app</th><th>B. Separate static hosting (Nginx/CDN)</th></tr></thead>
+  <tbody>
+    <tr><td>How</td><td>Copy <code>frontend/dist</code> into <code>backend/src/main/resources/static</code> at build time</td><td>Upload <code>dist/</code> to S3/CloudFront, Azure Static Web Apps, or Nginx; reverse-proxy <code>/api</code></td></tr>
+    <tr><td>Deployables</td><td>1 JAR</td><td>2</td></tr>
+    <tr><td>CORS</td><td>Not needed</td><td>Not needed if proxied; otherwise configure</td></tr>
+    <tr><td>Best for</td><td>Internal apps, small teams</td><td>Public sites, CDN caching, independent frontend deploys</td></tr>
+  </tbody>
+</table>
+<p>Option A needs a fallback route so deep links like <code>/orders/123</code> serve <code>index.html</code>. See <a href="security-config-deploy.html#serve-vue">Security, config &amp; deploy</a>.</p>
+
+<h2 id="testing-frontend">Testing the frontend</h2>
+<ul>
+  <li><strong>Vitest + @vue/test-utils</strong> for components and composables. Mock the API modules, not <code>fetch</code>.</li>
+  <li><strong>Playwright</strong> for a handful of end-to-end flows against the real backend ("create order → add line → place").</li>
+</ul>
+
+```ts
+// Example Vitest test for useAsync
+import { useAsync } from '@/composables/useAsync'
+import { ApiError } from '@/api/http'
+
+it('exposes the ProblemDetail message', async () => {
+  const { error, run } = useAsync(() => Promise.reject(new ApiError({ title: 'x', status: 409, detail: 'Cannot place an empty order' })))
+  await run()
+  expect(error.value).toBe('Cannot place an empty order')
+})
+```

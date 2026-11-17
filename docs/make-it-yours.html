@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A step-by-step path from &quot;I&#x27;ve been assigned a domain-driven webapp&quot; to a running first slice, using this template as the scaffold.">
+<title>Starting your own app — DDD Spring + Vue Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Spring + Vue Guide</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Start here</a></li>
+<li><a href="data-flow.html">DB to screen: the full data flow</a></li>
+</ol>
+<div class="nav-group">Concepts</div><ol>
+<li><a href="ddd-fundamentals.html">DDD fundamentals</a></li>
+<li><a href="strategic-design.html">Strategic design</a></li>
+<li><a href="tactical-patterns.html">Tactical patterns</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture-styles.html">Architecture styles</a></li>
+<li><a href="project-structure.html">Project structure</a></li>
+</ol>
+<div class="nav-group">Backend</div><ol>
+<li><a href="persistence.html">Persistence with JPA &amp; Hibernate</a></li>
+<li><a href="application-layer.html">Application layer &amp; use cases</a></li>
+<li><a href="domain-events.html">Domain &amp; integration events</a></li>
+<li><a href="rest-api.html">REST API design</a></li>
+</ol>
+<div class="nav-group">Frontend</div><ol>
+<li><a href="vue-frontend.html">Vue frontend</a></li>
+</ol>
+<div class="nav-group">Quality &amp; ops</div><ol>
+<li><a href="testing.html">Testing</a></li>
+<li><a href="security-config-deploy.html">Security, config &amp; deployment</a></li>
+</ol>
+<div class="nav-group">Decisions</div><ol>
+<li><a href="decisions.html">Design decisions (ADR log)</a></li>
+<li><a href="make-it-yours.html" aria-current="page" class="on">Starting your own app</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="sample-walkthrough.html">Sample app tour</a></li>
+<li><a href="glossary.html">Glossary</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Decisions</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Decisions</span>
+          <h1>Starting your own app</h1>
+          <p class="lede">A step-by-step path from "I've been assigned a domain-driven webapp" to a running first slice, using this template as the scaffold.</p>
+        </header>
+        <h2 id="step-0">Step 0: Copy and rename</h2>
+
+<div class="code"><div class="code-head"><span>Shell</span><button class="copy" type="button">Copy</button></div><pre><code class="language-bash"># Option 1: start from this repo
+cp -r ddd-spring-vue-template my-app &amp;&amp; cd my-app
+rm -rf .git &amp;&amp; git init
+
+# Rename the base package (com.example.shop → com.acme.claims), in main and test
+cd backend
+for d in src/main/java src/test/java; do
+  mkdir -p $d/com/acme &amp;&amp; mv $d/com/example/shop $d/com/acme/claims &amp;&amp; rmdir $d/com/example
+done
+grep -rl 'com.example.shop' src | xargs sed -i '' 's/com\.example\.shop/com.acme.claims/g'   # macOS sed; on Linux use sed -i</code></pre></div>
+<p>Then update <code>groupId</code>/<code>artifactId</code> in <code>pom.xml</code>, rename <code>ShopApplication</code>, and change <code>spring.application.name</code>. <strong>Option 2:</strong> generate a fresh project at <a href="https://start.spring.io">start.spring.io</a> (Web, Validation, Data JPA, Flyway, PostgreSQL, H2, Actuator), then copy over <code>sharedkernel</code>, <code>config</code>, the ArchUnit test, and the package conventions.</p>
+
+<h2 id="step-1">Step 1: Learn the domain before writing code</h2>
+<ol>
+  <li><strong>Talk to the domain experts.</strong> Ask them to walk you through a real case from start to finish. Write down every noun and verb they use.</li>
+  <li><strong>Run a mini Event Storming session</strong> (even one hour helps): list the domain events in time order, then add the commands, actors, and rules. See <a href="strategic-design.html#event-storming">Event Storming</a>.</li>
+  <li><strong>Start the glossary.</strong> Copy <a href="glossary.html">the glossary</a> and replace the shop terms with yours.</li>
+  <li><strong>Mark hotspots</strong>, the places where people disagree or say "it depends". Those are where the complexity, and the value, sits.</li>
+</ol>
+
+<h2 id="step-2">Step 2: Draw the context map</h2>
+<p>Group the events and commands into 2–4 candidate bounded contexts. For each one, write a single sentence of responsibility and classify it (core, supporting, or generic). Then draw the arrows: who needs what from whom?</p>
+
+<pre class="mermaid">
+flowchart LR
+  subgraph Example["Example: an insurance claims app"]
+    Policy["Policy&lt;br/&gt;(supporting)"]
+    Claims["Claims&lt;br/&gt;(core)"]
+    Payments["Payments&lt;br/&gt;(generic → Stripe/bank API)"]
+    Docs["Documents&lt;br/&gt;(generic → S3/Blob)"]
+  end
+  Claims -- "ACL: is policy active? coverage limits" --&gt; Policy
+  Claims -- "ClaimApproved event" --&gt; Payments
+  Claims -- "port: store evidence" --&gt; Docs
+</pre>
+<p>Turn each context into a top-level package with the four layer sub-packages, delete <code>catalog</code>/<code>ordering</code>, and update the ArchUnit rules to name your contexts.</p>
+
+<h2 id="step-3">Step 3: Model the core aggregate</h2>
+<p>Pick the most important command in the core context, then answer these questions on paper:</p>
+<table>
+  <thead><tr><th>Question</th><th>Shop example</th><th>Your answer</th></tr></thead>
+  <tbody>
+    <tr><td>Which command?</td><td>Place order</td><td></td></tr>
+    <tr><td>Which aggregate handles it?</td><td>Order</td><td></td></tr>
+    <tr><td>What must be true before?</td><td>Status DRAFT, at least one line</td><td></td></tr>
+    <tr><td>What changes?</td><td>Status → PLACED, placedAt set</td><td></td></tr>
+    <tr><td>What event results?</td><td>OrderPlaced</td><td></td></tr>
+    <tr><td>Who reacts to the event?</td><td>Catalog reserves stock</td><td></td></tr>
+    <tr><td>What other data does the command need?</td><td>Product price and name (from Catalog via the ACL)</td><td></td></tr>
+  </tbody>
+</table>
+<p>Then write the aggregate <strong>test-first</strong>, as plain Java:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// 1. Write the rule as a test
+@Test
+void claim_cannot_be_approved_above_policy_limit() {
+    Claim claim = Claim.submit(policyId, Money.of("12000", "USD"), "Water damage", clock);
+    assertThatThrownBy(() -&gt; claim.approve(Money.of("10000", "USD") /* limit */, adjuster, clock))
+            .isInstanceOf(DomainException.class)
+            .hasMessageContaining("exceeds policy limit");
+}
+
+// 2. Make it pass in the aggregate
+public void approve(Money policyLimit, AdjusterId by, Clock clock) {
+    requireStatus(ClaimStatus.UNDER_REVIEW, "approve");
+    if (claimedAmount.isGreaterThan(policyLimit))
+        throw new DomainException("Claimed amount " + claimedAmount + " exceeds policy limit " + policyLimit);
+    this.status = ClaimStatus.APPROVED;
+    this.approvedBy = by.value();
+    registerEvent(new ClaimApproved(id(), claimedAmount, clock.instant()));
+}</code></pre></div>
+
+<h2 id="step-4">Step 4: Add one vertical slice</h2>
+<p>For that aggregate, add one file per layer, copying the shape of the Ordering context:</p>
+<table>
+  <thead><tr><th>#</th><th>File</th><th>Copy from</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>db/migration/V1__create_schema.sql</code>: your tables, prefixed by context</td><td><code>V1__create_schema.sql</code></td></tr>
+    <tr><td>2</td><td><code>claims/domain/Claim.java</code> + VOs + <code>ClaimRepository</code></td><td><code>ordering/domain/*</code></td></tr>
+    <tr><td>3</td><td><code>claims/infrastructure/JpaClaimRepository.java</code> + Spring Data interface</td><td><code>ordering/infrastructure/JpaOrderRepository.java</code></td></tr>
+    <tr><td>4</td><td><code>claims/application/ClaimApplicationService.java</code>, <code>ClaimView</code>, commands</td><td><code>OrderApplicationService</code></td></tr>
+    <tr><td>5</td><td><code>claims/web/ClaimController.java</code></td><td><code>OrderController</code></td></tr>
+    <tr><td>6</td><td><code>frontend/src/api/claims.ts</code> + <code>features/claims/*.vue</code></td><td><code>api/ordering.ts</code>, <code>features/ordering</code></td></tr>
+    <tr><td>7</td><td>Integration test for the happy path + one rule violation</td><td><code>OrderFlowIntegrationTest</code></td></tr>
+  </tbody>
+</table>
+<p>Run <code>./mvnw test</code> (the ArchUnit rules will catch layering mistakes), then <code>npm run dev</code>, and click through it.</p>
+
+<h2 id="step-5">Step 5: Record decisions as you go</h2>
+<p>Every time you choose between options (sync vs async events, a new library, an aggregate boundary), add an ADR to <a href="decisions.html">the decision log</a>. Add your own pages to this guide (<code>docs/_chapters</code> + <code>build.py</code>), for example a "Claims domain" page with your context map and glossary.</p>
+
+<h2 id="pitfalls">Common pitfalls (and the fix)</h2>
+<table>
+  <thead><tr><th>Smell</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr><td>Entities with public setters and services full of <code>if</code>s</td><td>Move each rule into an intention-revealing method on the aggregate</td></tr>
+    <tr><td><code>@ManyToOne</code> from one aggregate to another</td><td>Store the ID; load the other aggregate through its repository if needed</td></tr>
+    <tr><td>One giant aggregate (e.g. <code>Customer</code> with all orders)</td><td>Find the real invariants, then split and reference by ID</td></tr>
+    <tr><td>Controllers calling repositories</td><td>Go through an application service</td></tr>
+    <tr><td>Entities returned from controllers</td><td>Return view records</td></tr>
+    <tr><td>The frontend recomputing totals or eligibility</td><td>Have the backend return it in the view (<code>total</code>, <code>allowedActions</code>)</td></tr>
+    <tr><td><code>Instant.now()</code> in domain code</td><td>Pass a <code>Clock</code></td></tr>
+    <tr><td>A "Utils" or "Helper" class with business logic</td><td>Usually a missing value object or domain service. Name it.</td></tr>
+    <tr><td>Generic names: <code>Manager</code>, <code>Processor</code>, <code>Data</code></td><td>Use a word from the ubiquitous language</td></tr>
+    <tr><td>Shared "common" module growing every sprint</td><td>Keep the shared kernel tiny. Duplicate small things instead of sharing them.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="day-one-checklist">Day-one checklist</h2>
+<ul>
+  <li>☐ Package renamed; app starts; tests pass</li>
+  <li>☐ Glossary started with at least 10 terms from domain experts</li>
+  <li>☐ Context map drawn (even on a whiteboard photo committed to <code>docs/</code>)</li>
+  <li>☐ ArchUnit rules updated with your context names</li>
+  <li>☐ First aggregate with unit tests for every invariant</li>
+  <li>☐ First Flyway migration</li>
+  <li>☐ One vertical slice visible in the Vue UI</li>
+  <li>☐ ADRs written for anything you changed from this template</li>
+  <li>☐ CI running <code>./mvnw verify</code> and <code>npm run build</code></li>
+</ul>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="decisions.html"><small>← Previous</small>Design decisions (ADR log)</a><a class="next" href="sample-walkthrough.html"><small>Next →</small>Sample app tour</a></nav>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

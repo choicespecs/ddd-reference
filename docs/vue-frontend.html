@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Structuring a Vue 3 + TypeScript app to sit cleanly on top of a domain-driven backend, without re-implementing the domain in the browser.">
+<title>Vue frontend — DDD Spring + Vue Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Spring + Vue Guide</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Start here</a></li>
+<li><a href="data-flow.html">DB to screen: the full data flow</a></li>
+</ol>
+<div class="nav-group">Concepts</div><ol>
+<li><a href="ddd-fundamentals.html">DDD fundamentals</a></li>
+<li><a href="strategic-design.html">Strategic design</a></li>
+<li><a href="tactical-patterns.html">Tactical patterns</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture-styles.html">Architecture styles</a></li>
+<li><a href="project-structure.html">Project structure</a></li>
+</ol>
+<div class="nav-group">Backend</div><ol>
+<li><a href="persistence.html">Persistence with JPA &amp; Hibernate</a></li>
+<li><a href="application-layer.html">Application layer &amp; use cases</a></li>
+<li><a href="domain-events.html">Domain &amp; integration events</a></li>
+<li><a href="rest-api.html">REST API design</a></li>
+</ol>
+<div class="nav-group">Frontend</div><ol>
+<li><a href="vue-frontend.html" aria-current="page" class="on">Vue frontend</a></li>
+</ol>
+<div class="nav-group">Quality &amp; ops</div><ol>
+<li><a href="testing.html">Testing</a></li>
+<li><a href="security-config-deploy.html">Security, config &amp; deployment</a></li>
+</ol>
+<div class="nav-group">Decisions</div><ol>
+<li><a href="decisions.html">Design decisions (ADR log)</a></li>
+<li><a href="make-it-yours.html">Starting your own app</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="sample-walkthrough.html">Sample app tour</a></li>
+<li><a href="glossary.html">Glossary</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Frontend</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Frontend</span>
+          <h1>Vue frontend</h1>
+          <p class="lede">Structuring a Vue 3 + TypeScript app to sit cleanly on top of a domain-driven backend, without re-implementing the domain in the browser.</p>
+        </header>
+        <h2 id="principles">Principles</h2>
+<ol>
+  <li><strong>The backend owns the rules.</strong> The UI may <em>hint</em> (hide the Place button on a placed order), but it never <em>decides</em>. It sends commands and displays the resulting state or error.</li>
+  <li><strong>Mirror the bounded contexts.</strong> <code>features/catalog</code> and <code>features/ordering</code> match the backend packages, so the language is the same on both sides.</li>
+  <li><strong>One API module per context</strong>, with functions named after the use cases (<code>orderingApi.place(id)</code>).</li>
+  <li><strong>Typed contracts.</strong> TS interfaces mirror the Java read models, and are ideally generated from OpenAPI.</li>
+</ol>
+
+<h2 id="structure">Folder structure</h2>
+<div class="tree">frontend/
+├── index.html
+├── vite.config.ts          dev server :5173, proxy /api → :8080
+├── package.json
+└── src/
+    ├── main.ts             createApp + router
+    ├── router.ts           routes grouped by context, lazy-loaded
+    ├── App.vue             shell: top nav per context
+    ├── style.css
+    ├── format.ts           money(), dateTime()
+    ├── api/
+    │   ├── http.ts         fetch wrapper → ApiError(ProblemDetail)
+    │   ├── types.ts        Product, Order, OrderLine (mirror backend views)
+    │   ├── catalog.ts      catalogApi.list / create / changePrice / receiveStock
+    │   └── ordering.ts     orderingApi.start / addLine / place / cancel …
+    ├── composables/
+    │   └── useAsync.ts     loading / error / data wrapper
+    └── features/
+        ├── catalog/
+        │   ├── ProductListView.vue
+        │   └── NewProductForm.vue
+        └── ordering/
+            ├── OrderListView.vue
+            ├── OrderDetailView.vue
+            └── StatusBadge.vue</div>
+
+<h2 id="api-client">The API client</h2>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// src/api/http.ts
+export class ApiError extends Error {
+  constructor(public readonly problem: ProblemDetail) {
+    super(problem.detail ?? problem.title)       // the domain's own message
+  }
+}
+
+export async function http&lt;T&gt;(path: string, init: RequestInit = {}): Promise&lt;T&gt; {
+  const res = await fetch(path, { ...init, headers: { 'Content-Type': 'application/json', ...init.headers } })
+  if (!res.ok) throw new ApiError(await res.json().catch(() =&gt; ({ title: res.statusText, status: res.status })))
+  return res.status === 204 ? (undefined as T) : res.json()
+}</code></pre></div>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// src/api/ordering.ts — reads like the application service
+export const orderingApi = {
+  get:     (id: string) =&gt; get&lt;Order&gt;(`/api/orders/${id}`),
+  start:   (customerEmail: string) =&gt; post&lt;Order&gt;('/api/orders', { customerEmail }),
+  addLine: (id: string, productId: string, quantity: number) =&gt;
+             post&lt;Order&gt;(`/api/orders/${id}/lines`, { productId, quantity }),
+  place:   (id: string) =&gt; post&lt;Order&gt;(`/api/orders/${id}/place`),
+  cancel:  (id: string) =&gt; post&lt;Order&gt;(`/api/orders/${id}/cancel`),
+}</code></pre></div>
+<p>Why <code>fetch</code> and not axios? Fewer dependencies, and the wrapper is 20 lines. Axios is a fine choice if you want interceptors (auth token refresh) out of the box.</p>
+
+<h2 id="state">State: composables vs Pinia</h2>
+<p>The template keeps state <strong>local to views</strong> with a small composable:</p>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// src/composables/useAsync.ts
+export function useAsync&lt;T, A extends unknown[] = []&gt;(fn: (...args: A) =&gt; Promise&lt;T&gt;) {
+  const data = shallowRef&lt;T | null&gt;(null)
+  const loading = ref(false)
+  const error = ref&lt;string | null&gt;(null)
+  async function run(...args: A) {
+    loading.value = true; error.value = null
+    try { return (data.value = await fn(...args)) }
+    catch (e) { error.value = e instanceof ApiError ? e.message : String(e); return null }
+    finally { loading.value = false }
+  }
+  return { data, loading, error, run }
+}</code></pre></div>
+
+<div class="code"><div class="code-head"><span>Vue SFC</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;script setup lang="ts"&gt;
+const { data: products, loading, error, run: load } = useAsync(() =&gt; catalogApi.list())
+onMounted(load)
+&lt;/script&gt;</code></pre></div>
+
+<table>
+  <thead><tr><th>Option</th><th>Good for</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Local refs + composables (template)</td><td>Page-scoped data; most CRUD and workflow screens</td><td>Simplest; data is refetched on navigation</td></tr>
+    <tr><td><strong>Pinia</strong></td><td>State shared across many components/routes: current user, cart, feature flags</td><td>The official Vue store; devtools support</td></tr>
+    <tr><td><strong>TanStack Query (vue-query)</strong></td><td>Server-state caching, background refetch, deduplication, pagination</td><td>Excellent when many screens show the same server data</td></tr>
+  </tbody>
+</table>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// If you add Pinia — a store per context, actions call the API module
+export const useCartStore = defineStore('cart', () =&gt; {
+  const order = ref&lt;Order | null&gt;(null)
+  const itemCount = computed(() =&gt; order.value?.lines.reduce((n, l) =&gt; n + l.quantity, 0) ?? 0)
+  async function add(productId: string) {
+    order.value ??= await orderingApi.start(currentUser.email)
+    order.value = await orderingApi.addLine(order.value.id, productId, 1)
+  }
+  return { order, itemCount, add }
+})</code></pre></div>
+<div class="callout warn"><span class="label">Don't mirror the aggregate in the store</span>
+<p>A store that recomputes totals or checks "can this be placed?" duplicates the domain, and the two copies will drift. Store the server's <code>OrderView</code> as-is and replace it with whatever the next command returns.</p></div>
+
+<h2 id="commands-in-ui">Sending commands, rendering results</h2>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// OrderDetailView.vue — every command returns the new OrderView; just swap it in
+const { loading, error, run: exec } = useAsync(async (command: () =&gt; Promise&lt;Order&gt;) =&gt; {
+  order.value = await command()
+})
+const place  = () =&gt; exec(() =&gt; orderingApi.place(props.id))
+const cancel = () =&gt; exec(() =&gt; orderingApi.cancel(props.id))</code></pre></div>
+
+<div class="code"><div class="code-head"><span>Vue SFC</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;button v-if="order.status === 'DRAFT'" :disabled="loading" @click="place"&gt;Place order&lt;/button&gt;
+&lt;p v-if="error" class="error"&gt;{{ error }}&lt;/p&gt;   &lt;!-- e.g. "Cannot place an empty order" --&gt;</code></pre></div>
+
+<h3 id="allowed-actions">Better: let the server say which actions are allowed</h3>
+<p>The <code>v-if="order.status === 'DRAFT'"</code> check repeats a small piece of domain knowledge in the UI. For complex state machines, have the read model include the allowed actions:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// backend
+public record OrderView(…, Set&lt;String&gt; allowedActions) {}
+// built from the aggregate: order.canPlace(), order.canCancel() …</code></pre></div>
+
+<div class="code"><div class="code-head"><span>Vue SFC</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;button v-if="order.allowedActions.includes('place')" @click="place"&gt;Place order&lt;/button&gt;</code></pre></div>
+
+<h2 id="forms">Forms and validation</h2>
+<ul>
+  <li>Use HTML attributes (<code>required</code>, <code>min</code>, <code>type="email"</code>) for instant feedback.</li>
+  <li>Show server ProblemDetail messages for everything else. They come from the domain and are already user-readable.</li>
+  <li>For field-level server errors, extend <code>GlobalExceptionHandler</code> to add an <code>errors: { field: message }</code> property to the ProblemDetail for 400s, then map those messages next to the matching inputs.</li>
+  <li>For complex forms, libraries such as VeeValidate + Zod give schema-driven client validation.</li>
+</ul>
+
+<h2 id="types">Keeping TypeScript types in sync</h2>
+
+<div class="code"><div class="code-head"><span>Shell</span><button class="copy" type="button">Copy</button></div><pre><code class="language-bash">npm i -D openapi-typescript
+npx openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts</code></pre></div>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">import type { components } from './schema'
+export type Order = components['schemas']['OrderView']
+export type Product = components['schemas']['ProductView']</code></pre></div>
+<p>Add this as an npm script (<code>"gen:api"</code>) and run it in CI. That way a backend change that breaks the frontend fails the build instead of failing in production.</p>
+
+<h2 id="dev-proxy">Dev server and the proxy</h2>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// vite.config.ts
+server: { port: 5173, proxy: { '/api': 'http://localhost:8080' } }</code></pre></div>
+<p>In the browser everything is same-origin (<code>:5173</code>), so there are no CORS preflights and no cookie headaches. The backend also has a CORS config (<code>WebConfig</code>) for when you point the frontend at the API by absolute URL.</p>
+
+<h2 id="deploy-options">Production: two ways to ship the frontend</h2>
+<table>
+  <thead><tr><th></th><th>A. Spring Boot serves the built Vue app</th><th>B. Separate static hosting (Nginx/CDN)</th></tr></thead>
+  <tbody>
+    <tr><td>How</td><td>Copy <code>frontend/dist</code> into <code>backend/src/main/resources/static</code> at build time</td><td>Upload <code>dist/</code> to S3/CloudFront, Azure Static Web Apps, or Nginx; reverse-proxy <code>/api</code></td></tr>
+    <tr><td>Deployables</td><td>1 JAR</td><td>2</td></tr>
+    <tr><td>CORS</td><td>Not needed</td><td>Not needed if proxied; otherwise configure</td></tr>
+    <tr><td>Best for</td><td>Internal apps, small teams</td><td>Public sites, CDN caching, independent frontend deploys</td></tr>
+  </tbody>
+</table>
+<p>Option A needs a fallback route so deep links like <code>/orders/123</code> serve <code>index.html</code>. See <a href="security-config-deploy.html#serve-vue">Security, config &amp; deploy</a>.</p>
+
+<h2 id="testing-frontend">Testing the frontend</h2>
+<ul>
+  <li><strong>Vitest + @vue/test-utils</strong> for components and composables. Mock the API modules, not <code>fetch</code>.</li>
+  <li><strong>Playwright</strong> for a handful of end-to-end flows against the real backend ("create order → add line → place").</li>
+</ul>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">// Example Vitest test for useAsync
+import { useAsync } from '@/composables/useAsync'
+import { ApiError } from '@/api/http'
+
+it('exposes the ProblemDetail message', async () =&gt; {
+  const { error, run } = useAsync(() =&gt; Promise.reject(new ApiError({ title: 'x', status: 409, detail: 'Cannot place an empty order' })))
+  await run()
+  expect(error.value).toBe('Cannot place an empty order')
+})</code></pre></div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="rest-api.html"><small>← Previous</small>REST API design</a><a class="next" href="testing.html"><small>Next →</small>Testing</a></nav>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>
