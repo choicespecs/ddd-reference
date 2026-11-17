@@ -1,11 +1,16 @@
 package com.example.shop.ordering.domain;
 
+import lombok.Value;
+
 import java.util.Objects;
 import java.util.UUID;
 
-public record OrderId(UUID value) {
-    public OrderId {
-        Objects.requireNonNull(value, "value");
+@Value
+public class OrderId {
+    UUID value;
+
+    public OrderId(UUID value) {
+        this.value = Objects.requireNonNull(value, "value");
     }
 
     public static OrderId newId() {

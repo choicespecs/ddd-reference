@@ -106,20 +106,26 @@ flowchart TB
 <p>A <strong>value object</strong> has no identity. Two <code>Money(10.00, USD)</code> instances are interchangeable, just like two copies of the number 10. Value objects are:</p>
 <ul>
   <li><strong>Immutable</strong>. You never change one; you replace it. <code>price = price.plus(tax)</code>.</li>
-  <li><strong>Equal by value</strong>. Java <code>record</code>s give you this for free.</li>
+  <li><strong>Equal by value</strong>. Override <code>equals</code>/<code>hashCode</code> on every field, or let Lombok's <code>@Value</code> generate them. Java 11 has no records; on Java 16+ a <code>record</code> gives you this for free.</li>
   <li><strong>Self-validating</strong>. An invalid one can't exist, so code that receives a <code>Sku</code> never has to re-check the format.</li>
   <li><strong>Behaviour-rich</strong>. Arithmetic, formatting, and comparisons live on the type, not in utility classes.</li>
 </ul>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// sharedkernel/Money.java (simplified)
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// sharedkernel/Money.java (simplified) — hand-written because JPA embeddables need a
+// no-arg constructor and non-final fields. Still immutable from the outside: no setters.
 @Embeddable
-public record Money(BigDecimal amount, String currency) {
+public class Money {
+    private BigDecimal amount;
+    private String currency;
 
-    public Money {                                   // compact constructor = validation
+    protected Money() {}                             // JPA only
+
+    public Money(BigDecimal amount, String currency) {   // constructor = validation
         Objects.requireNonNull(amount, "amount");
         Currency.getInstance(currency);              // rejects "XYZ"
         if (amount.signum() &lt; 0) throw new DomainException("Money cannot be negative");
-        amount = amount.setScale(2, RoundingMode.HALF_EVEN);   // normalize
+        this.amount = amount.setScale(2, RoundingMode.HALF_EVEN);   // normalize
+        this.currency = currency;
     }
 
     public Money plus(Money other) {
@@ -130,7 +136,32 @@ public record Money(BigDecimal amount, String currency) {
     public Money times(int quantity) {
         return new Money(amount.multiply(BigDecimal.valueOf(quantity)), currency);
     }
+
+    public BigDecimal getAmount() { return amount; }
+    public String getCurrency()   { return currency; }
+
+    @Override public boolean equals(Object o) { … amount and currency … }
+    @Override public int hashCode()           { return Objects.hash(amount, currency); }
 }</code></pre></div>
+
+<p>Value objects that aren't JPA embeddables are simpler. Lombok's <code>@Value</code> makes the class final and the fields private and final, and generates getters, <code>equals</code>, <code>hashCode</code> and <code>toString</code>. You write only the validating constructor:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// catalog/domain/Sku.java
+@Value
+public class Sku {
+    private static final Pattern FORMAT = Pattern.compile("^[A-Z]{2,10}-\\d{4,8}$");
+
+    String value;                          // @Value makes it private final + getValue()
+
+    public Sku(String value) {             // explicit constructor replaces Lombok's
+        if (value == null || !FORMAT.matcher(value).matches())
+            throw new DomainException("Invalid SKU '" + value + "'");
+        this.value = value;
+    }
+}</code></pre></div>
+
+<div class="callout"><span class="label">Without Lombok</span>
+<p>Plain Java 11 needs the same class with <code>private final String value;</code>, a <code>getValue()</code>, and hand-written <code>equals</code>/<code>hashCode</code>/<code>toString</code>. IDEs generate these, but they're easy to forget to update when a field is added. That's the main reason the template uses Lombok (see the <a href="decisions.html#adr-lombok">ADR</a>).</p></div>
 
 <h3 id="primitive-obsession">Fixing primitive obsession</h3>
 <p><em>Primitive obsession</em> means passing <code>String</code>, <code>UUID</code>, and <code>BigDecimal</code> around for concepts that have rules. It leads to bugs like this one, which compiles happily:</p>
@@ -140,16 +171,22 @@ void addLine(UUID orderId, UUID productId, int qty);
 service.addLine(productId, orderId, 2);   // swapped — runtime bug</code></pre></div>
 
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Typed IDs make the swap a compile error
-public record OrderId(UUID value) { … }
-public record ProductId(UUID value) { … }
+@Value public class OrderId   { UUID value; … }
+@Value public class ProductId { UUID value; … }
 void addLine(OrderId orderId, ProductId productId, int qty);</code></pre></div>
 
 <p>Good candidates for value objects: identifiers, money, quantities with units, email/phone, date ranges, addresses, percentages, codes with formats (SKU, IBAN, postal code).</p>
 
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// A date range VO — note the behaviour that would otherwise be duplicated everywhere
-public record DateRange(LocalDate start, LocalDate end) {
-    public DateRange {
+@Value
+public class DateRange {
+    LocalDate start;
+    LocalDate end;
+
+    public DateRange(LocalDate start, LocalDate end) {
         if (end.isBefore(start)) throw new DomainException("end before start");
+        this.start = start;
+        this.end = end;
     }
     public boolean contains(LocalDate d) { return !d.isBefore(start) &amp;&amp; !d.isAfter(end); }
     public boolean overlaps(DateRange o)  { return !end.isBefore(o.start) &amp;&amp; !o.end.isBefore(start); }
@@ -188,7 +225,7 @@ public class OrderLine {
 }</code></pre></div>
 
 <div class="callout"><span class="label">equals/hashCode on JPA entities</span>
-<p>The template doesn't override <code>equals</code> on entities, because aggregates are compared by ID explicitly (<code>order.id().equals(otherId)</code>). If you do put entities in <code>Set</code>s, base <code>equals</code> on the ID. Because IDs are assigned in the constructor rather than by the database, this works without the usual "null ID before persist" problem.</p></div>
+<p>The template doesn't override <code>equals</code> on entities, because aggregates are compared by ID explicitly (<code>order.getId().equals(otherId)</code>). If you do put entities in <code>Set</code>s, base <code>equals</code> on the ID. Because IDs are assigned in the constructor rather than by the database, this works without the usual "null ID before persist" problem.</p></div>
 
 <h2 id="aggregates">Aggregates</h2>
 <p>An <strong>aggregate</strong> is a group of objects that must stay consistent <em>together</em>, with one entity as its <strong>root</strong>. It is the most important tactical pattern and the one most often misused.</p>
@@ -196,7 +233,7 @@ public class OrderLine {
 <h3 id="aggregate-rules">The rules</h3>
 <ol>
   <li><strong>Protect invariants inside the boundary.</strong> All rules that must be <em>immediately</em> true ("the total equals the sum of the lines", "lines share one currency") are enforced by the root.</li>
-  <li><strong>Outside code holds references to the root only.</strong> Nobody outside <code>Order</code> keeps a reference to an <code>OrderLine</code>. <code>lines()</code> returns an unmodifiable list.</li>
+  <li><strong>Outside code holds references to the root only.</strong> Nobody outside <code>Order</code> keeps a reference to an <code>OrderLine</code>. <code>getLines()</code> returns an unmodifiable list.</li>
   <li><strong>Reference other aggregates by ID.</strong> <code>OrderLine</code> stores <code>productId</code>, not a <code>@ManyToOne Product</code>. This keeps aggregates independent, avoids loading huge graphs, and lets contexts split later.</li>
   <li><strong>One aggregate per transaction</strong> (as a guideline). Changes to other aggregates should happen via domain events, ideally with eventual consistency.</li>
   <li><strong>Keep them small.</strong> A large aggregate is slow to load and causes lock conflicts.</li>
@@ -236,7 +273,7 @@ public class Order extends AggregateRoot {            // AggregateRoot: @Version
     public void addLine(UUID productId, String name, Money unitPrice, int qty) {
         requireStatus(DRAFT, "add lines");                      // invariant 1
         findLine(productId).ifPresentOrElse(
-            l -&gt; l.changeQuantity(l.quantity() + qty),          // merge duplicates
+            l -&gt; l.changeQuantity(l.getQuantity() + qty),          // merge duplicates
             () -&gt; {
                 if (lines.size() &gt;= MAX_LINES) throw …;         // invariant 4
                 requireSameCurrency(unitPrice);                 // invariant 3
@@ -248,7 +285,7 @@ public class Order extends AggregateRoot {            // AggregateRoot: @Version
     public void cancel(Clock clock) { … }
     public Money total() { … }                                  // derived, never stored
 
-    public List&lt;OrderLine&gt; lines() { return Collections.unmodifiableList(lines); }
+    public List&lt;OrderLine&gt; getLines() { return Collections.unmodifiableList(lines); }
 }</code></pre></div>
 
 <h2 id="repositories">Repositories</h2>
@@ -274,7 +311,7 @@ interface SpringDataOrderRepository extends JpaRepository&lt;Order, UUID&gt; {  
 @Repository
 class JpaOrderRepository implements OrderRepository {
     private final SpringDataOrderRepository jpa;
-    public Optional&lt;Order&gt; findById(OrderId id) { return jpa.findById(id.value()); }
+    public Optional&lt;Order&gt; findById(OrderId id) { return jpa.findById(id.getValue()); }
     …
 }</code></pre></div>
 <p>Why not let the domain interface extend <code>JpaRepository</code> directly? You can, and it's a common pragmatic shortcut (see the <a href="decisions.html#adr-repositories">decision log</a>). The cost is that <code>JpaRepository</code> exposes about 20 methods, including <code>deleteAll()</code> and <code>findAll()</code> on a table that might hold millions of rows. Every one of those becomes part of your domain's API.</p>
@@ -294,9 +331,9 @@ class JpaOrderRepository implements OrderRepository {
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Example (not in the template): pricing that depends on customer tier and promotions
 public class PricingPolicy {
     public Money priceFor(Product product, CustomerTier tier, List&lt;Promotion&gt; active) {
-        Money base = product.price();
+        Money base = product.getPrice();
         Money discounted = active.stream()
-                .filter(p -&gt; p.appliesTo(product.id(), tier))
+                .filter(p -&gt; p.appliesTo(product.getId(), tier))
                 .map(p -&gt; p.apply(base))
                 .min(Comparator.comparing(Money::amount))
                 .orElse(base);
@@ -319,9 +356,18 @@ public class PricingPolicy {
 <h2 id="domain-events">Domain events</h2>
 <p>A <strong>domain event</strong> records something meaningful that happened. Name it in the past tense, make it immutable, and include enough data for listeners to act on it.</p>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public record OrderPlaced(OrderId orderId, List&lt;Line&gt; lines, Money total, Instant occurredAt)
-        implements DomainEvent {
-    public record Line(UUID productId, int quantity) {}
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Value
+public class OrderPlaced implements DomainEvent {
+    OrderId orderId;
+    List&lt;Line&gt; lines;
+    Money total;
+    Instant occurredAt;
+
+    @Value
+    public static class Line {
+        UUID productId;
+        int quantity;
+    }
 }</code></pre></div>
 <p>Aggregates <em>register</em> events, and the application layer <em>publishes</em> them after saving. Events decouple side effects (reserving stock, sending email, updating a search index) from the aggregate that caused them. The full story is in <a href="domain-events.html">Domain &amp; integration events</a>.</p>
 
@@ -331,8 +377,8 @@ public class PricingPolicy {
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public final class EligibleForFreeShipping {
     private static final Money THRESHOLD = Money.of("50.00", "USD");
     public boolean isSatisfiedBy(Order order) {
-        return order.total().amount().compareTo(THRESHOLD.amount()) &gt;= 0
-            &amp;&amp; order.lines().stream().noneMatch(l -&gt; l.productName().contains("Oversize"));
+        return order.total().amount().compareTo(THRESHOLD.getAmount()) &gt;= 0
+            &amp;&amp; order.getLines().stream().noneMatch(l -&gt; l.getProductName().contains("Oversize"));
     }
 }</code></pre></div>
 

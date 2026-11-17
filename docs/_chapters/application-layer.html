@@ -8,11 +8,11 @@ lede: The thin layer that turns "a request arrived" into "the domain did somethi
 
 ```java
 public OrderView addLine(Commands.AddLine cmd) {
-    Order order = load(cmd.orderId());                                   // 1. load
-    OrderableProduct product = catalog.find(cmd.productId())             // 2. gather inputs
-            .orElseThrow(() -> new NotFoundException("Product", cmd.productId()));
-    if (!product.available()) throw new DomainException("… not available");
-    order.addLine(product.productId(), product.name(), product.price(), cmd.quantity());  // 3. one domain call
+    Order order = load(cmd.getOrderId());                                   // 1. load
+    OrderableProduct product = catalog.find(cmd.getProductId())             // 2. gather inputs
+            .orElseThrow(() -> new NotFoundException("Product", cmd.getProductId()));
+    if (!product.isAvailable()) throw new DomainException("… not available");
+    order.addLine(product.getProductId(), product.getName(), product.getPrice(), cmd.getQuantity());  // 3. one domain call
     return saveAndPublish(order);                                        // 4. save, publish, return view
 }
 ```
@@ -70,30 +70,40 @@ private OrderView saveAndPublish(Order order) {
 ```
 
 <h2 id="commands">Commands</h2>
-<p>A <strong>command</strong> is an immutable request to do something, named in the imperative. Records are a perfect fit:</p>
+<p>A <strong>command</strong> is an immutable request to do something, named in the imperative. On Java 11, Lombok's <code>@Value</code> gives you an immutable class with a constructor, getters and <code>equals</code> in a few lines:</p>
 
 ```java
 public final class Commands {
-    public record StartOrder(String customerEmail) {}
-    public record AddLine(UUID orderId, UUID productId, int quantity) {}
-    public record ChangeQuantity(UUID orderId, UUID productId, int quantity) {}
-    public record RemoveLine(UUID orderId, UUID productId) {}
+    @Value public static class StartOrder     { String customerEmail; }
+    @Value public static class AddLine        { UUID orderId; UUID productId; int quantity; }
+    @Value public static class ChangeQuantity { UUID orderId; UUID productId; int quantity; }
+    @Value public static class RemoveLine     { UUID orderId; UUID productId; }
 }
+// usage: new Commands.AddLine(orderId, productId, 2);  cmd.getQuantity()
 ```
 <p>Why not pass the web request DTO straight through? Because the application layer may be called from places other than REST: a message listener, a scheduled job, a CLI, or a test. Commands belong to the application, while request DTOs belong to the HTTP contract. The two often look identical at first and drift apart later.</p>
-<p>Commands carry <em>primitive-ish</em> types (<code>UUID</code>, <code>String</code>). The application service converts them into domain value objects (<code>new CustomerEmail(cmd.customerEmail())</code>), and that is where format validation fires.</p>
+<p>Commands carry <em>primitive-ish</em> types (<code>UUID</code>, <code>String</code>). The application service converts them into domain value objects (<code>new CustomerEmail(cmd.getCustomerEmail())</code>), and that is where format validation fires.</p>
 
 <h2 id="read-models">Read models (views)</h2>
 
 ```java
-public record OrderView(UUID id, String customerEmail, String status, List<LineView> lines,
-                        BigDecimal total, String currency, Instant createdAt, Instant placedAt,
-                        long version) {
+@Value
+public class OrderView {
+    UUID id;
+    String customerEmail;
+    String status;
+    List<LineView> lines;
+    BigDecimal total;
+    String currency;
+    Instant createdAt;
+    Instant placedAt;
+    long version;
+
     static OrderView from(Order o) { … }
 }
 ```
 <ul>
-  <li>Records, flat, with no behaviour, serializable as-is.</li>
+  <li>Immutable (<code>@Value</code>), flat, with no behaviour. Jackson serializes the getters as-is (<code>getCustomerEmail()</code> → <code>"customerEmail"</code>).</li>
   <li>Shaped for consumers. For example, <code>total</code> is pre-computed and <code>status</code> is a string.</li>
   <li>Built <strong>inside</strong> the transaction, so lazy associations can load.</li>
   <li>The mapping is written by hand as a static factory. <a href="#mapping">MapStruct</a> is the alternative when there are dozens.</li>
@@ -156,7 +166,7 @@ class PlaceOrderHandler implements PlaceOrder {
   <thead><tr><th></th><th>Hand-written (<code>static from()</code>)</th><th>MapStruct</th></tr></thead>
   <tbody>
     <tr><td>Setup</td><td>None</td><td>Annotation processor in the pom</td></tr>
-    <tr><td>Works with rich domain (no getters named <code>getX</code>)</td><td>Yes</td><td>Needs config for record-style accessors and VOs</td></tr>
+    <tr><td>Works with rich domain (behaviour methods, VOs)</td><td>Yes</td><td>Needs custom mapping methods for VOs (<code>Money</code> → amount + currency)</td></tr>
     <tr><td>Compile-time safety</td><td>Yes</td><td>Yes (with <code>unmappedTargetPolicy = ERROR</code>)</td></tr>
     <tr><td>Debuggable</td><td>Trivially</td><td>Look at generated sources</td></tr>
     <tr><td>Use when</td><td>A few views per context</td><td>Many large DTOs</td></tr>
@@ -167,7 +177,7 @@ class PlaceOrderHandler implements PlaceOrder {
 <table>
   <thead><tr><th>Kind</th><th>Example</th><th>Where</th></tr></thead>
   <tbody>
-    <tr><td>Syntactic / shape</td><td>Field present, is a number, ≤ 200 chars</td><td>Web: Bean Validation on the request record (<code>@NotBlank</code>, <code>@Size</code>)</td></tr>
+    <tr><td>Syntactic / shape</td><td>Field present, is a number, ≤ 200 chars</td><td>Web: Bean Validation on the request DTO (<code>@NotBlank</code>, <code>@Size</code>)</td></tr>
     <tr><td>Format of a concept</td><td>SKU matches <code>[A-Z]+-\d+</code>; email looks like an email</td><td>Domain: value object constructor</td></tr>
     <tr><td>Business invariant</td><td>Can't place an empty order; stock ≥ 0</td><td>Domain: aggregate method</td></tr>
     <tr><td>Needs other data</td><td>SKU must be unique; product must exist and be active</td><td>Application service (with repository/port); DB unique constraint as a backstop</td></tr>

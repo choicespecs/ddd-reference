@@ -1,5 +1,7 @@
 package com.example.shop.integration;
 
+import lombok.Value;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +14,14 @@ import java.util.UUID;
  * safe to share — and are exactly what you would put on Kafka/RabbitMQ if the contexts were
  * ever split into separate services.
  */
-public record OrderPlacedIntegrationEvent(UUID orderId, List<Line> lines) {
-    public record Line(UUID productId, int quantity) {}
+@Value
+public class OrderPlacedIntegrationEvent {
+    UUID orderId;
+    List<Line> lines;
+
+    @Value
+    public static class Line {
+        UUID productId;
+        int quantity;
+    }
 }

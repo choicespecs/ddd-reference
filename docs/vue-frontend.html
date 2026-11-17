@@ -191,7 +191,7 @@ const cancel = () =&gt; exec(() =&gt; orderingApi.cancel(props.id))</code></pre>
 <p>The <code>v-if="order.status === 'DRAFT'"</code> check repeats a small piece of domain knowledge in the UI. For complex state machines, have the read model include the allowed actions:</p>
 
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// backend
-public record OrderView(…, Set&lt;String&gt; allowedActions) {}
+@Value public class OrderView { …; Set&lt;String&gt; allowedActions; }
 // built from the aggregate: order.canPlace(), order.canCancel() …</code></pre></div>
 
 <div class="code"><div class="code-head"><span>Vue SFC</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;button v-if="order.allowedActions.includes('place')" @click="place"&gt;Place order&lt;/button&gt;</code></pre></div>
@@ -199,8 +199,8 @@ public record OrderView(…, Set&lt;String&gt; allowedActions) {}
 <h2 id="forms">Forms and validation</h2>
 <ul>
   <li>Use HTML attributes (<code>required</code>, <code>min</code>, <code>type="email"</code>) for instant feedback.</li>
-  <li>Show server ProblemDetail messages for everything else. They come from the domain and are already user-readable.</li>
-  <li>For field-level server errors, extend <code>GlobalExceptionHandler</code> to add an <code>errors: { field: message }</code> property to the ProblemDetail for 400s, then map those messages next to the matching inputs.</li>
+  <li>Show the server's problem+json <code>detail</code> messages for everything else. They come from the domain and are already user-readable.</li>
+  <li>For field-level server errors, read the <code>errors: { field: message }</code> map that <code>GlobalExceptionHandler</code> already adds to 400 validation responses, and show each message next to its input.</li>
   <li>For complex forms, libraries such as VeeValidate + Zod give schema-driven client validation.</li>
 </ul>
 

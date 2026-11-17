@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Thin controllers, task-based endpoints that speak the ubiquitous language, validation at the edge, and consistent errors with ProblemDetail.">
+<meta name="description" content="Thin controllers, task-based endpoints that speak the ubiquitous language, validation at the edge, and consistent problem+json errors.">
 <title>REST API design — DDD Spring + Vue Guide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,7 +68,7 @@
         <header class="chapter-head">
           <span class="eyebrow">Backend</span>
           <h1>REST API design</h1>
-          <p class="lede">Thin controllers, task-based endpoints that speak the ubiquitous language, validation at the edge, and consistent errors with ProblemDetail.</p>
+          <p class="lede">Thin controllers, task-based endpoints that speak the ubiquitous language, validation at the edge, and consistent problem+json errors.</p>
         </header>
         <h2 id="endpoints">The template's API</h2>
 <table>
@@ -117,26 +117,38 @@ class OrderController {
 
     @PostMapping("/{id}/lines")
     OrderView addLine(@PathVariable UUID id, @Valid @RequestBody AddLineRequest req) {
-        return orders.addLine(new Commands.AddLine(id, req.productId(), req.quantity()));
+        return orders.addLine(new Commands.AddLine(id, req.getProductId(), req.getQuantity()));
     }
 
-    record AddLineRequest(@NotNull UUID productId, @Min(1) @Max(99) int quantity) {}
+    @Value
+    static class AddLineRequest {
+        @NotNull UUID productId;
+        @Min(1) @Max(99) int quantity;
+    }
 }</code></pre></div>
 <p>A controller does four things: bind the HTTP input, validate its shape, build a command, and return the view. If you find an <code>if</code> that encodes business logic in a controller, move it into the domain.</p>
-<p>Request DTOs are <strong>nested records</strong>, so the HTTP contract sits next to the endpoint that uses it, and nothing else can depend on it.</p>
+<p>Request DTOs are <strong>nested immutable classes</strong>, so the HTTP contract sits next to the endpoint that uses it, and nothing else can depend on it.</p>
+<div class="callout"><span class="label">How Jackson builds immutable DTOs on Java 11</span>
+<p>A <code>@Value</code> class has no setters and no no-arg constructor. <code>backend/lombok.config</code> sets <code>lombok.anyConstructor.addConstructorProperties = true</code>, so Lombok puts <code>@ConstructorProperties</code> on the generated constructor and Jackson passes the JSON fields to it by name. Without that setting you'd need <code>@JsonCreator</code> plus <code>@JsonProperty</code> on every constructor parameter.</p></div>
 
 <h2 id="validation">Bean Validation at the edge</h2>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">record CreateProductRequest(
-        @NotBlank @Size(max = 32) String sku,
-        @NotBlank @Size(max = 200) String name,
-        @Size(max = 2000) String description,
-        @NotNull @DecimalMin("0.00") BigDecimal price,
-        @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
-        @Min(0) int initialStock) {}</code></pre></div>
-<p><code>@Valid</code> on the parameter triggers validation. Failures become <code>MethodArgumentNotValidException</code>, and because <code>GlobalExceptionHandler</code> extends <code>ResponseEntityExceptionHandler</code>, they come back as a 400 ProblemDetail automatically.</p>
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Value
+static class CreateProductRequest {
+    @NotBlank @Size(max = 32) String sku;
+    @NotBlank @Size(max = 200) String name;
+    @Size(max = 2000) String description;
+    @NotNull @DecimalMin("0.00") BigDecimal price;
+    @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency;
+    @Min(0) int initialStock;
+}</code></pre></div>
+<p><code>@Valid</code> on the parameter triggers validation. Failures become <code>MethodArgumentNotValidException</code>, and because <code>GlobalExceptionHandler</code> extends <code>ResponseEntityExceptionHandler</code>, they come back as a 400 problem+json response with per-field messages:</p>
 
-<h2 id="errors">Errors: RFC 9457 ProblemDetail</h2>
+<div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">{"type":"https://example.com/problems/validation","title":"Invalid request","status":400,
+ "detail":"One or more fields are invalid","instance":"/api/orders",
+ "errors":{"customerEmail":"must be a well-formed email address"}}</code></pre></div>
+
+<h2 id="errors">Errors: RFC 7807/9457 problem details</h2>
 <p>Every error from the API has the same shape (<code>Content-Type: application/problem+json</code>):</p>
 
 <div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">{
@@ -146,6 +158,22 @@ class OrderController {
   "detail": "Insufficient stock for STKR-0001: requested 5, available 2",
   "instance": "/api/orders/0b6e…/place"
 }</code></pre></div>
+<p>Spring Framework 6 (Boot 3) has a built-in <code>ProblemDetail</code> class for this. Spring 5 (Boot 2.7) doesn't, so the template defines <code>config/ApiProblem</code> with the same fields and returns it as <code>application/problem+json</code>:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@ExceptionHandler(DomainException.class)
+ResponseEntity&lt;Object&gt; ruleViolated(DomainException ex, WebRequest request) {
+    return ApiProblem.of(HttpStatus.CONFLICT, "business-rule", "Business rule violated",
+            ex.getMessage(), path(request)).toResponse();
+}
+
+// Spring's own MVC errors (malformed JSON, 405, 415…) get the same shape:
+@Override
+protected ResponseEntity&lt;Object&gt; handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
+                                                         HttpStatus status, WebRequest request) {
+    return ApiProblem.of(status, "http-" + status.value(), status.getReasonPhrase(),
+            ex.getMessage(), path(request)).toResponse();
+}</code></pre></div>
+<p>When you upgrade to Boot 3, delete <code>ApiProblem</code> and return Spring's <code>ProblemDetail</code>. The JSON stays identical, so the frontend doesn't notice.</p>
 
 <table>
   <thead><tr><th>Exception</th><th>Status</th><th>Meaning</th></tr></thead>
@@ -163,7 +191,7 @@ class OrderController {
 <h2 id="status-codes">Status codes and responses</h2>
 <ul>
   <li><strong>201 Created</strong> for creation, ideally with a <code>Location</code> header:
-    <code>ResponseEntity.created(URI.create("/api/orders/" + view.id())).body(view)</code>.</li>
+    <code>ResponseEntity.created(URI.create("/api/orders/" + view.getId())).body(view)</code>.</li>
   <li><strong>Return the new state</strong> from commands (the template does). That saves the client a round trip and keeps the UI in sync with the server's view.</li>
   <li><strong>204 No Content</strong> if you prefer commands to return nothing (a stricter CQS style).</li>
   <li><strong>202 Accepted</strong> for asynchronous commands (see <a href="domain-events.html#eventual-consistency">eventual consistency</a>).</li>
@@ -176,10 +204,10 @@ Page&lt;OrderSummary&gt; search(@RequestParam(required = false) OrderStatus stat
                           @PageableDefault(size = 20, sort = "createdAt", direction = DESC) Pageable page) {
     return orderQueries.search(status, page);
 }</code></pre></div>
-<p>Since Spring Data 3.3, serializing <code>Page</code> directly logs a warning. Wrap it in your own <code>PageResponse&lt;T&gt;(List&lt;T&gt; items, int page, int size, long total)</code> record, or enable <code>@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)</code>.</p>
+<p>Serializing Spring Data's <code>Page</code> directly works, but it exposes a large, implementation-specific JSON shape (<code>pageable</code>, <code>sort</code>, <code>first</code>…), and newer Spring Data versions warn about it. Wrap it in your own <code>PageResponse&lt;T&gt;</code> class with <code>items</code>, <code>page</code>, <code>size</code> and <code>total</code> so the contract is yours.</p>
 
 <h2 id="openapi">OpenAPI and frontend types</h2>
-<p>springdoc generates <code>/v3/api-docs</code> (JSON) from the controllers and records. The frontend can generate TypeScript from it, so the TS interfaces never drift from the Java records:</p>
+<p>springdoc generates <code>/v3/api-docs</code> (JSON) from the controllers and DTO classes. The frontend can generate TypeScript from it, so the TS interfaces never drift from the Java views:</p>
 
 <div class="code"><div class="code-head"><span>Shell</span><button class="copy" type="button">Copy</button></div><pre><code class="language-bash">cd frontend
 npx openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts</code></pre></div>

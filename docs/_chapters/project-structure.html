@@ -12,7 +12,7 @@ lede: Every folder in the backend, what's allowed to go in it, and the tests tha
 │   ├── DomainEvent.java
 │   ├── DomainException.java         "a business rule was violated" → HTTP 409
 │   ├── NotFoundException.java       → HTTP 404
-│   └── Money.java                   @Embeddable record
+│   └── Money.java                   @Embeddable value object
 │
 ├── integration/                   ← published language between contexts
 │   ├── OrderPlacedIntegrationEvent.java
@@ -22,7 +22,7 @@ lede: Every folder in the backend, what's allowed to go in it, and the tests tha
 │   ├── domain/                      Product, ProductId, Sku, ProductRepository (port)
 │   ├── application/                 CatalogService, commands, ProductView, StockReservationHandler
 │   ├── infrastructure/              JpaProductRepository (adapter), SpringDataProductRepository
-│   └── web/                         ProductController + request records
+│   └── web/                         ProductController + request DTOs
 │
 ├── ordering/                      ← bounded context (core, downstream)
 │   ├── domain/                      Order, OrderLine, OrderStatus, OrderId, CustomerEmail,
@@ -30,9 +30,10 @@ lede: Every folder in the backend, what's allowed to go in it, and the tests tha
 │   ├── application/                 OrderApplicationService, Commands, OrderView,
 │   │                                ProductCatalog (port), IntegrationEventTranslator
 │   ├── infrastructure/              JpaOrderRepository, CatalogAdapter (ACL)
-│   └── web/                         OrderController + request records
+│   └── web/                         OrderController + request DTOs
 │
 └── config/                        ← Spring wiring that belongs to no context
+    ├── ApiProblem.java              problem+json error body (Spring 5 has no ProblemDetail)
     ├── ClockConfig.java
     ├── GlobalExceptionHandler.java
     └── WebConfig.java               CORS</div>
@@ -156,7 +157,7 @@ classes().that().implement(DomainEvent.class).should().resideInAPackage("..domai
   <thead><tr><th>Kind</th><th>Convention</th><th>Example</th></tr></thead>
   <tbody>
     <tr><td>Aggregate root</td><td>Plain noun from the language</td><td><code>Order</code>, <code>Product</code></td></tr>
-    <tr><td>Typed ID</td><td><code>&lt;Aggregate&gt;Id</code> record</td><td><code>OrderId</code></td></tr>
+    <tr><td>Typed ID</td><td><code>&lt;Aggregate&gt;Id</code> <code>@Value</code> class</td><td><code>OrderId</code></td></tr>
     <tr><td>Repository port</td><td><code>&lt;Aggregate&gt;Repository</code></td><td><code>OrderRepository</code></td></tr>
     <tr><td>Repository adapter</td><td><code>Jpa&lt;Aggregate&gt;Repository</code></td><td><code>JpaOrderRepository</code></td></tr>
     <tr><td>Spring Data interface</td><td><code>SpringData&lt;Aggregate&gt;Repository</code></td><td><code>SpringDataOrderRepository</code></td></tr>
@@ -164,7 +165,7 @@ classes().that().implement(DomainEvent.class).should().resideInAPackage("..domai
     <tr><td>Read model</td><td><code>&lt;Thing&gt;View</code></td><td><code>OrderView</code></td></tr>
     <tr><td>Domain event</td><td>Past tense</td><td><code>OrderPlaced</code></td></tr>
     <tr><td>Integration event</td><td>Past tense + <code>IntegrationEvent</code></td><td><code>OrderPlacedIntegrationEvent</code></td></tr>
-    <tr><td>Request DTO</td><td>Nested record <code>&lt;Action&gt;Request</code> in the controller</td><td><code>AddLineRequest</code></td></tr>
+    <tr><td>Request DTO</td><td>Nested <code>@Value</code> class <code>&lt;Action&gt;Request</code> in the controller</td><td><code>AddLineRequest</code></td></tr>
     <tr><td>Tables</td><td><code>&lt;context&gt;_&lt;thing&gt;</code></td><td><code>ordering_order_line</code></td></tr>
   </tbody>
 </table>

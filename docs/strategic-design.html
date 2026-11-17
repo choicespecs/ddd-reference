@@ -161,7 +161,8 @@ flowchart LR
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/application/ProductCatalog.java — a port owned by Ordering
 public interface ProductCatalog {
     Optional&lt;OrderableProduct&gt; find(UUID productId);
-    record OrderableProduct(UUID productId, String name, Money price, boolean available) {}
+    @Value
+    class OrderableProduct { UUID productId; String name; Money price; boolean available; }
 }</code></pre></div>
 <p>The adapter is the <em>only</em> place where Catalog's vocabulary appears:</p>
 
@@ -176,11 +177,11 @@ class CatalogAdapter implements ProductCatalog {
 
     private static OrderableProduct translate(ProductView p) {
         // Ordering's idea of "available" combines two Catalog facts
-        boolean available = p.active() &amp;&amp; p.stockOnHand() &gt; 0;
-        return new OrderableProduct(p.id(), p.name(), new Money(p.price(), p.currency()), available);
+        boolean available = p.isActive() &amp;&amp; p.getStockOnHand() &gt; 0;
+        return new OrderableProduct(p.getId(), p.getName(), new Money(p.getPrice(), p.getCurrency()), available);
     }
 }</code></pre></div>
-<p>If Catalog becomes a separate microservice tomorrow, only this class changes: it would use a <code>RestClient</code> call instead of a method call. <code>Order</code>, <code>OrderApplicationService</code>, and every test of them stay exactly as they are.</p>
+<p>If Catalog becomes a separate microservice tomorrow, only this class changes: it would use a <code>RestTemplate</code>/<code>WebClient</code> call instead of a method call. <code>Order</code>, <code>OrderApplicationService</code>, and every test of them stay exactly as they are.</p>
 
 <h2 id="event-storming">Event Storming: discovering it all</h2>
 <p><strong>Event Storming</strong> (Alberto Brandolini) is a workshop format for discovering the domain with experts. You need a long wall (or Miro), sticky notes in a few colours, and the right people.</p>

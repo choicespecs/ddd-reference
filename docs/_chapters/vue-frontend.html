@@ -139,7 +139,7 @@ const cancel = () => exec(() => orderingApi.cancel(props.id))
 
 ```java
 // backend
-public record OrderView(…, Set<String> allowedActions) {}
+@Value public class OrderView { …; Set<String> allowedActions; }
 // built from the aggregate: order.canPlace(), order.canCancel() …
 ```
 
@@ -150,8 +150,8 @@ public record OrderView(…, Set<String> allowedActions) {}
 <h2 id="forms">Forms and validation</h2>
 <ul>
   <li>Use HTML attributes (<code>required</code>, <code>min</code>, <code>type="email"</code>) for instant feedback.</li>
-  <li>Show server ProblemDetail messages for everything else. They come from the domain and are already user-readable.</li>
-  <li>For field-level server errors, extend <code>GlobalExceptionHandler</code> to add an <code>errors: { field: message }</code> property to the ProblemDetail for 400s, then map those messages next to the matching inputs.</li>
+  <li>Show the server's problem+json <code>detail</code> messages for everything else. They come from the domain and are already user-readable.</li>
+  <li>For field-level server errors, read the <code>errors: { field: message }</code> map that <code>GlobalExceptionHandler</code> already adds to 400 validation responses, and show each message next to its input.</li>
   <li>For complex forms, libraries such as VeeValidate + Zod give schema-driven client validation.</li>
 </ul>
 

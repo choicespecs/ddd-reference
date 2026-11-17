@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Application service for the Catalog context: one public method per use case.
@@ -33,12 +34,12 @@ public class CatalogService {
     }
 
     public ProductView createProduct(CreateProductCommand cmd) {
-        Sku sku = new Sku(cmd.sku());
+        Sku sku = new Sku(cmd.getSku());
         products.findBySku(sku).ifPresent(existing -> {
             throw new DomainException("SKU already exists: " + sku);
         });
-        Product product = Product.create(sku, cmd.name(), cmd.description(),
-                new Money(cmd.price(), cmd.currency()), cmd.initialStock());
+        Product product = Product.create(sku, cmd.getName(), cmd.getDescription(),
+                new Money(cmd.getPrice(), cmd.getCurrency()), cmd.getInitialStock());
         return ProductView.from(products.save(product));
     }
 
@@ -64,7 +65,7 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public List<ProductView> listActiveProducts() {
-        return products.findAllActive().stream().map(ProductView::from).toList();
+        return products.findAllActive().stream().map(ProductView::from).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

@@ -3,13 +3,14 @@ package com.example.shop.catalog.web;
 import com.example.shop.catalog.application.CatalogService;
 import com.example.shop.catalog.application.CreateProductCommand;
 import com.example.shop.catalog.application.ProductView;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import javax.validation.Valid;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
+import javax.validation.constraints.Size;
+import lombok.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,7 +27,8 @@ import java.util.UUID;
 
 /**
  * REST adapter for the Catalog context. Thin: translate HTTP ⇄ commands/views, nothing else.
- * Request DTOs are nested records so the HTTP contract lives next to the endpoint that uses it.
+ * Request DTOs are nested immutable classes so the HTTP contract lives next to the endpoint that
+ * uses it. Jackson builds them through Lombok's constructor (see backend/lombok.config).
  */
 @RestController
 @RequestMapping("/api/products")
@@ -52,29 +54,38 @@ class ProductController {
     @ResponseStatus(HttpStatus.CREATED)
     ProductView create(@Valid @RequestBody CreateProductRequest req) {
         return catalog.createProduct(new CreateProductCommand(
-                req.sku(), req.name(), req.description(), req.price(), req.currency(), req.initialStock()));
+                req.getSku(), req.getName(), req.getDescription(), req.getPrice(), req.getCurrency(),
+                req.getInitialStock()));
     }
 
     @PutMapping("/{id}/price")
     ProductView changePrice(@PathVariable UUID id, @Valid @RequestBody ChangePriceRequest req) {
-        return catalog.changePrice(id, req.price(), req.currency());
+        return catalog.changePrice(id, req.getPrice(), req.getCurrency());
     }
 
     @PostMapping("/{id}/stock")
     ProductView receiveStock(@PathVariable UUID id, @Valid @RequestBody ReceiveStockRequest req) {
-        return catalog.receiveStock(id, req.quantity());
+        return catalog.receiveStock(id, req.getQuantity());
     }
 
-    record CreateProductRequest(
-            @NotBlank @Size(max = 32) String sku,
-            @NotBlank @Size(max = 200) String name,
-            @Size(max = 2000) String description,
-            @NotNull @DecimalMin("0.00") BigDecimal price,
-            @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
-            @Min(0) int initialStock) {}
+    @Value
+    static class CreateProductRequest {
+        @NotBlank @Size(max = 32) String sku;
+        @NotBlank @Size(max = 200) String name;
+        @Size(max = 2000) String description;
+        @NotNull @DecimalMin("0.00") BigDecimal price;
+        @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency;
+        @Min(0) int initialStock;
+    }
 
-    record ChangePriceRequest(@NotNull @DecimalMin("0.00") BigDecimal price,
-                              @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency) {}
+    @Value
+    static class ChangePriceRequest {
+        @NotNull @DecimalMin("0.00") BigDecimal price;
+        @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency;
+    }
 
-    record ReceiveStockRequest(@Min(1) int quantity) {}
+    @Value
+    static class ReceiveStockRequest {
+        @Min(1) int quantity;
+    }
 }

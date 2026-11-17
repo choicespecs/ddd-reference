@@ -32,8 +32,8 @@ class OrderTest {
     @Test
     void new_order_is_draft_with_normalized_email() {
         Order order = draft();
-        assertThat(order.status()).isEqualTo(OrderStatus.DRAFT);
-        assertThat(order.customerEmail().value()).isEqualTo("ada@example.com");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.DRAFT);
+        assertThat(order.getCustomerEmail().getValue()).isEqualTo("ada@example.com");
         assertThat(order.total()).isEqualTo(Money.of("0", "USD"));
     }
 
@@ -43,8 +43,8 @@ class OrderTest {
         order.addLine(book, "DDD", Money.of("50.00", "USD"), 1);
         order.addLine(book, "DDD", Money.of("50.00", "USD"), 2);
 
-        assertThat(order.lines()).hasSize(1);
-        assertThat(order.lines().get(0).quantity()).isEqualTo(3);
+        assertThat(order.getLines()).hasSize(1);
+        assertThat(order.getLines().get(0).getQuantity()).isEqualTo(3);
         assertThat(order.total()).isEqualTo(Money.of("150.00", "USD"));
     }
 
@@ -91,13 +91,13 @@ class OrderTest {
 
             order.place(clock);
 
-            assertThat(order.status()).isEqualTo(OrderStatus.PLACED);
-            assertThat(order.placedAt()).isEqualTo(clock.instant());
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PLACED);
+            assertThat(order.getPlacedAt()).isEqualTo(clock.instant());
             assertThat(order.peekDomainEvents())
                     .singleElement()
                     .isInstanceOfSatisfying(OrderPlaced.class, e -> {
-                        assertThat(e.total()).isEqualTo(Money.of("100.00", "USD"));
-                        assertThat(e.lines()).containsExactly(new OrderPlaced.Line(book, 2));
+                        assertThat(e.getTotal()).isEqualTo(Money.of("100.00", "USD"));
+                        assertThat(e.getLines()).containsExactly(new OrderPlaced.Line(book, 2));
                     });
         }
 
@@ -121,7 +121,7 @@ class OrderTest {
         void cancelling_a_draft_raises_no_event() {
             Order order = draft();
             order.cancel(clock);
-            assertThat(order.status()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
             assertThat(order.peekDomainEvents()).isEmpty();
         }
 

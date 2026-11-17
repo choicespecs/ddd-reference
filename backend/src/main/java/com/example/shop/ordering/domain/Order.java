@@ -5,17 +5,17 @@ import com.example.shop.ordering.domain.events.OrderPlaced;
 import com.example.shop.sharedkernel.AggregateRoot;
 import com.example.shop.sharedkernel.DomainException;
 import com.example.shop.sharedkernel.Money;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
-import jakarta.persistence.Table;
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.FetchType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.OneToMany;
+import javax.persistence.OrderBy;
+import javax.persistence.Table;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Aggregate root of the Ordering context. The aggregate = Order + its OrderLines.
@@ -76,8 +77,8 @@ public class Order extends AggregateRoot {
     }
 
     private Order(OrderId id, CustomerEmail customer, Instant now) {
-        this.id = id.value();
-        this.customerEmail = customer.value();
+        this.id = id.getValue();
+        this.customerEmail = customer.getValue();
         this.status = OrderStatus.DRAFT;
         this.createdAt = now;
     }
@@ -96,14 +97,15 @@ public class Order extends AggregateRoot {
         requireStatus(OrderStatus.DRAFT, "add lines");
         Optional<OrderLine> existing = findLine(productId);
         if (existing.isPresent()) {
-            existing.get().changeQuantity(existing.get().quantity() + quantity);
+            existing.get().changeQuantity(existing.get().getQuantity() + quantity);
             return;
         }
         if (lines.size() >= MAX_LINES) {
             throw new DomainException("An order can have at most " + MAX_LINES + " lines");
         }
-        if (!lines.isEmpty() && !lines.get(0).unitPrice().currency().equals(unitPrice.currency())) {
-            throw new DomainException("All lines must use " + lines.get(0).unitPrice().currency());
+        String orderCurrency = lines.isEmpty() ? null : lines.get(0).getUnitPrice().getCurrency();
+        if (orderCurrency != null && !orderCurrency.equals(unitPrice.getCurrency())) {
+            throw new DomainException("All lines must use " + orderCurrency);
         }
         lines.add(new OrderLine(productId, productName, unitPrice, quantity));
     }
@@ -125,7 +127,7 @@ public class Order extends AggregateRoot {
         }
         this.status = OrderStatus.PLACED;
         this.placedAt = clock.instant();
-        registerEvent(new OrderPlaced(id(), snapshotLines(), total(), placedAt));
+        registerEvent(new OrderPlaced(getId(), snapshotLines(), total(), placedAt));
     }
 
     public void ship() {
@@ -135,13 +137,19 @@ public class Order extends AggregateRoot {
 
     public void cancel(Clock clock) {
         switch (status) {
-            case DRAFT -> status = OrderStatus.CANCELLED;
-            case PLACED -> {
+            case DRAFT:
                 status = OrderStatus.CANCELLED;
-                registerEvent(new OrderCancelled(id(), snapshotLines(), clock.instant()));
-            }
-            case SHIPPED -> throw new DomainException("A shipped order cannot be cancelled");
-            case CANCELLED -> throw new DomainException("Order is already cancelled");
+                break;
+            case PLACED:
+                status = OrderStatus.CANCELLED;
+                registerEvent(new OrderCancelled(getId(), snapshotLines(), clock.instant()));
+                break;
+            case SHIPPED:
+                throw new DomainException("A shipped order cannot be cancelled");
+            case CANCELLED:
+                throw new DomainException("Order is already cancelled");
+            default:
+                throw new IllegalStateException("Unknown status " + status);
         }
     }
 
@@ -149,7 +157,7 @@ public class Order extends AggregateRoot {
 
     public Money total() {
         if (lines.isEmpty()) return Money.zero("USD");
-        Money sum = Money.zero(lines.get(0).unitPrice().currency());
+        Money sum = Money.zero(lines.get(0).getUnitPrice().getCurrency());
         for (OrderLine line : lines) {
             sum = sum.plus(line.lineTotal());
         }
@@ -165,7 +173,7 @@ public class Order extends AggregateRoot {
     }
 
     private Optional<OrderLine> findLine(UUID productId) {
-        return lines.stream().filter(l -> l.productId().equals(productId)).findFirst();
+        return lines.stream().filter(l -> l.getProductId().equals(productId)).findFirst();
     }
 
     private OrderLine line(UUID productId) {
@@ -174,15 +182,17 @@ public class Order extends AggregateRoot {
     }
 
     private List<OrderPlaced.Line> snapshotLines() {
-        return lines.stream().map(l -> new OrderPlaced.Line(l.productId(), l.quantity())).toList();
+        return lines.stream()
+                .map(l -> new OrderPlaced.Line(l.getProductId(), l.getQuantity()))
+                .collect(Collectors.toList());
     }
 
     // ---- read accessors --------------------------------------------------
 
-    public OrderId id() { return new OrderId(id); }
-    public CustomerEmail customerEmail() { return new CustomerEmail(customerEmail); }
-    public OrderStatus status() { return status; }
-    public List<OrderLine> lines() { return Collections.unmodifiableList(lines); }
-    public Instant createdAt() { return createdAt; }
-    public Instant placedAt() { return placedAt; }
+    public OrderId getId() { return new OrderId(id); }
+    public CustomerEmail getCustomerEmail() { return new CustomerEmail(customerEmail); }
+    public OrderStatus getStatus() { return status; }
+    public List<OrderLine> getLines() { return Collections.unmodifiableList(lines); }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getPlacedAt() { return placedAt; }
 }

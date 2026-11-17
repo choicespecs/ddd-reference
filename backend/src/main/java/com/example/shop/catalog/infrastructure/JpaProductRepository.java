@@ -21,12 +21,12 @@ class JpaProductRepository implements ProductRepository {
 
     @Override
     public Optional<Product> findById(ProductId id) {
-        return jpa.findById(id.value());
+        return jpa.findById(id.getValue());
     }
 
     @Override
     public Optional<Product> findBySku(Sku sku) {
-        return jpa.findBySku(sku.value());
+        return jpa.findBySku(sku.getValue());
     }
 
     @Override

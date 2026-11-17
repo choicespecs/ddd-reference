@@ -98,7 +98,7 @@
     <tr><td><strong>Optimistic locking</strong></td><td>Detects concurrent updates through a version column instead of holding locks.</td><td><a href="persistence.html#optimistic-locking">Persistence</a></td></tr>
     <tr><td><strong>Outbox</strong></td><td>Store outgoing events in the same transaction as the state change, and relay them later.</td><td><a href="domain-events.html#outbox">Events</a></td></tr>
     <tr><td><strong>Port / adapter</strong></td><td>A port is an interface owned by the core; an adapter is a technology-specific implementation.</td><td><a href="architecture-styles.html#hexagonal">Architecture</a></td></tr>
-    <tr><td><strong>ProblemDetail</strong></td><td>RFC 9457 standard JSON format for HTTP API errors.</td><td><a href="rest-api.html#errors">REST API</a></td></tr>
+    <tr><td><strong>Problem details (problem+json)</strong></td><td>RFC 7807/9457 standard JSON format for HTTP API errors. Produced here by <code>ApiProblem</code>; Spring 6 calls its built-in version <code>ProblemDetail</code>.</td><td><a href="rest-api.html#errors">REST API</a></td></tr>
     <tr><td><strong>Published language</strong></td><td>A documented shared format for inter-context communication.</td><td><a href="strategic-design.html#context-mapping">Strategic</a></td></tr>
     <tr><td><strong>Read model / view</strong></td><td>A data structure shaped for a query or screen, with no behaviour.</td><td><a href="application-layer.html#read-models">Application layer</a></td></tr>
     <tr><td><strong>Repository</strong></td><td>Collection-like access to aggregates that hides persistence.</td><td><a href="tactical-patterns.html#repositories">Tactical</a></td></tr>
@@ -118,7 +118,7 @@
   <tbody>
     <tr><td>Product</td><td>Something we sell, identified by a SKU</td><td><code>catalog.domain.Product</code></td></tr>
     <tr><td>SKU</td><td>Stock-keeping unit; format <code>LETTERS-DIGITS</code>, e.g. BOOK-0001</td><td><code>Sku</code></td></tr>
-    <tr><td>Stock on hand</td><td>Units physically available and not reserved. Never negative.</td><td><code>Product.stockOnHand()</code></td></tr>
+    <tr><td>Stock on hand</td><td>Units physically available and not reserved. Never negative.</td><td><code>Product.getStockOnHand()</code></td></tr>
     <tr><td>Receive stock</td><td>Goods arrive from a supplier; stock increases</td><td><code>Product.receiveStock()</code></td></tr>
     <tr><td>Reserve</td><td>Set aside stock for a placed order</td><td><code>Product.reserve()</code></td></tr>
     <tr><td>Release</td><td>Return reserved stock after a cancellation</td><td><code>Product.release()</code></td></tr>

@@ -20,7 +20,7 @@ class JpaOrderRepository implements OrderRepository {
 
     @Override
     public Optional<Order> findById(OrderId id) {
-        return jpa.findById(id.value());
+        return jpa.findById(id.getValue());
     }
 
     @Override

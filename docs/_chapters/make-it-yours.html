@@ -76,7 +76,7 @@ public void approve(Money policyLimit, AdjusterId by, Clock clock) {
     if (claimedAmount.isGreaterThan(policyLimit))
         throw new DomainException("Claimed amount " + claimedAmount + " exceeds policy limit " + policyLimit);
     this.status = ClaimStatus.APPROVED;
-    this.approvedBy = by.value();
+    this.approvedBy = by.getValue();
     registerEvent(new ClaimApproved(id(), claimedAmount, clock.instant()));
 }
 ```
@@ -108,7 +108,7 @@ public void approve(Money policyLimit, AdjusterId by, Clock clock) {
     <tr><td><code>@ManyToOne</code> from one aggregate to another</td><td>Store the ID; load the other aggregate through its repository if needed</td></tr>
     <tr><td>One giant aggregate (e.g. <code>Customer</code> with all orders)</td><td>Find the real invariants, then split and reference by ID</td></tr>
     <tr><td>Controllers calling repositories</td><td>Go through an application service</td></tr>
-    <tr><td>Entities returned from controllers</td><td>Return view records</td></tr>
+    <tr><td>Entities returned from controllers</td><td>Return view classes (read models)</td></tr>
     <tr><td>The frontend recomputing totals or eligibility</td><td>Have the backend return it in the view (<code>total</code>, <code>allowedActions</code>)</td></tr>
     <tr><td><code>Instant.now()</code> in domain code</td><td>Pass a <code>Clock</code></td></tr>
     <tr><td>A "Utils" or "Helper" class with business logic</td><td>Usually a missing value object or domain service. Name it.</td></tr>

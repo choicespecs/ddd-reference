@@ -1,8 +1,8 @@
 package com.example.shop.sharedkernel;
 
-import jakarta.persistence.MappedSuperclass;
-import jakarta.persistence.Transient;
-import jakarta.persistence.Version;
+import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
+import javax.persistence.Version;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,7 +42,7 @@ public abstract class AggregateRoot {
         return Collections.unmodifiableList(domainEvents);
     }
 
-    public long version() {
+    public long getVersion() {
         return version;
     }
 }

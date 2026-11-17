@@ -1,13 +1,35 @@
 package com.example.shop.ordering.application;
 
+import lombok.Value;
+
 import java.util.UUID;
 
-/** Input records for Ordering use cases. Grouped in one file because each is a one-liner. */
+/** Input classes for Ordering use cases. Grouped in one file because each is tiny. */
 public final class Commands {
     private Commands() {}
 
-    public record StartOrder(String customerEmail) {}
-    public record AddLine(UUID orderId, UUID productId, int quantity) {}
-    public record ChangeQuantity(UUID orderId, UUID productId, int quantity) {}
-    public record RemoveLine(UUID orderId, UUID productId) {}
+    @Value
+    public static class StartOrder {
+        String customerEmail;
+    }
+
+    @Value
+    public static class AddLine {
+        UUID orderId;
+        UUID productId;
+        int quantity;
+    }
+
+    @Value
+    public static class ChangeQuantity {
+        UUID orderId;
+        UUID productId;
+        int quantity;
+    }
+
+    @Value
+    public static class RemoveLine {
+        UUID orderId;
+        UUID productId;
+    }
 }

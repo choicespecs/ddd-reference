@@ -126,7 +126,7 @@ order.pullDomainEvents().forEach(events::publishEvent);</code></pre></div>
 class IntegrationEventTranslator {
     @EventListener
     void on(OrderPlaced e) {
-        publisher.publishEvent(new OrderPlacedIntegrationEvent(e.orderId().value(), toLines(e.lines())));
+        publisher.publishEvent(new OrderPlacedIntegrationEvent(e.getOrderId().getValue(), toLines(e.getLines())));
     }
 }</code></pre></div>
 
@@ -136,7 +136,7 @@ class IntegrationEventTranslator {
 class StockReservationHandler {          // in catalog.application — depends only on integration.*
     @EventListener
     void on(OrderPlacedIntegrationEvent event) {
-        event.lines().forEach(l -&gt; catalog.reserveStock(l.productId(), l.quantity()));
+        event.getLines().forEach(l -&gt; catalog.reserveStock(l.getProductId(), l.getQuantity()));
     }
 }</code></pre></div>
 
@@ -163,7 +163,7 @@ class OrderConfirmationEmailer {
     @TransactionalEventListener            // AFTER_COMMIT: never email about an order that rolled back
     @Async                                 // don't make the user wait for SMTP
     void on(OrderPlaced e) {
-        mailer.sendConfirmation(e.orderId());
+        mailer.sendConfirmation(e.getOrderId());
     }
 }</code></pre></div>
 <div class="callout warn"><span class="label">Gotcha</span>
@@ -223,7 +223,7 @@ stateDiagram-v2
 <h2 id="event-design">Designing good events</h2>
 <ul>
   <li><strong>Past tense, business language</strong>: <code>OrderPlaced</code>, not <code>OrderStatusChangedToTwo</code>.</li>
-  <li><strong>Immutable records</strong> with an <code>occurredAt</code> timestamp.</li>
+  <li><strong>Immutable</strong> (<code>@Value</code> classes on Java 11, records on 16+) with an <code>occurredAt</code> timestamp.</li>
   <li><strong>Enough data to act without calling back</strong> (the lines and quantities here). It shouldn't be the whole aggregate, though.</li>
   <li><strong>Integration events: add fields, never remove or rename them.</strong> If you must break the contract, publish <code>OrderPlacedV2</code> alongside the old event for a while.</li>
   <li><strong>Consumers are idempotent</strong>. Store processed event IDs, or make the operation naturally idempotent.</li>

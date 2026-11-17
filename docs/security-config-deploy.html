@@ -109,10 +109,10 @@ class SecurityConfig {
     SecurityFilterChain api(HttpSecurity http) throws Exception {
         return http
             .authorizeHttpRequests(auth -&gt; auth
-                .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
-                .requestMatchers("/api/products/**").hasRole("CATALOG_ADMIN")
-                .requestMatchers("/api/**").authenticated()
+                .antMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                .antMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                .antMatchers("/api/products/**").hasRole("CATALOG_ADMIN")
+                .antMatchers("/api/**").authenticated()   // Spring Security 6 renamed these to requestMatchers(...)
                 .anyRequest().permitAll())                       // static Vue files
             .oauth2ResourceServer(o -&gt; o.jwt(Customizer.withDefaults()))
             .sessionManagement(s -&gt; s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -131,7 +131,7 @@ class SecurityConfig {
 
 public OrderView cancel(UUID orderId) {
     Order order = load(orderId);
-    if (!order.customerEmail().value().equals(currentUser.email()) &amp;&amp; !currentUser.hasRole("SUPPORT"))
+    if (!order.getCustomerEmail().getValue().equals(currentUser.email()) &amp;&amp; !currentUser.hasRole("SUPPORT"))
         throw new AccessDeniedException("Not your order");
     order.cancel(clock);
     return saveAndPublish(order);
@@ -153,7 +153,7 @@ class SpringSecurityCurrentUser implements CurrentUser {
   <li>☐ Authentication on every <code>/api/**</code> endpoint that isn't intentionally public</li>
   <li>☐ Authorization on the resource itself (ownership checks), not just on the role</li>
   <li>☐ Request DTOs whitelist the fields a client may set. Never bind entities.</li>
-  <li>☐ ProblemDetail <code>detail</code> never contains stack traces or SQL (the template sets <code>server.error.include-message: always</code> for the domain messages; keep <code>include-stacktrace: never</code>)</li>
+  <li>☐ The problem+json <code>detail</code> never contains stack traces or SQL (the template sets <code>server.error.include-message: always</code> for the domain messages; keep <code>include-stacktrace: never</code>)</li>
   <li>☐ CORS allow-list from configuration, never <code>*</code> together with credentials</li>
   <li>☐ Secrets from environment variables or a vault, never committed</li>
   <li>☐ Dependency scanning (<code>./mvnw org.owasp:dependency-check-maven:check</code>, <code>npm audit</code>, Dependabot)</li>
@@ -187,8 +187,14 @@ server:
 
 <h3 id="typed-config">Typed configuration</h3>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@ConfigurationProperties(prefix = "app.ordering")
-public record OrderingProperties(int maxLinesPerOrder, Duration draftExpiry) {}
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Immutable, constructor-bound properties (Spring Boot 2.2+)
+@ConfigurationProperties(prefix = "app.ordering")
+@ConstructorBinding                      // Boot 2.x needs this; Boot 3 infers it
+@Value                                   // Lombok: final fields + getters
+public class OrderingProperties {
+    int maxLinesPerOrder;
+    Duration draftExpiry;
+}
 
 // enable with @EnableConfigurationProperties(OrderingProperties.class) or @ConfigurationPropertiesScan</code></pre></div>
 <p>Note that business limits like <code>MAX_LINES</code> are constants in the domain in the template. Move them to configuration only if the business wants to change them without a release. When you do, pass the value into the domain method rather than injecting Spring config into entities.</p>
@@ -254,13 +260,13 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM eclipse-temurin:17-jdk AS api
+FROM eclipse-temurin:11-jdk AS api
 WORKDIR /src
 COPY backend/ ./
 COPY --from=web /web/dist ./src/main/resources/static
 RUN ./mvnw -q -DskipTests package
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:11-jre
 WORKDIR /app
 COPY --from=api /src/target/*.jar app.jar
 USER 1000
@@ -273,7 +279,7 @@ ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]</code></p
   <li><strong>Health/readiness</strong>: <code>/actuator/health</code>, plus <code>management.endpoint.health.probes.enabled=true</code> for Kubernetes liveness and readiness probes.</li>
   <li><strong>Metrics</strong>: add <code>micrometer-registry-prometheus</code>. Record business metrics too, e.g. <code>meterRegistry.counter("orders.placed").increment()</code> in an <code>OrderPlaced</code> listener.</li>
   <li><strong>Tracing</strong>: <code>micrometer-tracing-bridge-otel</code> + an OTLP exporter.</li>
-  <li><strong>Logging</strong>: structured JSON logs (<code>logging.structured.format.console=ecs</code> in Boot 3.4+). Log domain events at INFO level, because they make an excellent audit trail.</li>
+  <li><strong>Logging</strong>: structured JSON logs (on Boot 2.7, add <code>logstash-logback-encoder</code> and a <code>logback-spring.xml</code>; Boot 3.4+ has <code>logging.structured.format.console=ecs</code> built in). Log domain events at INFO level, because they make an excellent audit trail.</li>
 </ul>
 
 <h2 id="ci">CI pipeline sketch</h2>
@@ -287,7 +293,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '17', cache: maven }
+        with: { distribution: temurin, java-version: '11', cache: maven }
       - run: cd backend &amp;&amp; ./mvnw -B verify
   frontend:
     runs-on: ubuntu-latest

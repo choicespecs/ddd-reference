@@ -112,8 +112,8 @@ flowchart TB
 
         order.place(clock);
 
-        assertThat(order.status()).isEqualTo(OrderStatus.PLACED);
-        assertThat(order.placedAt()).isEqualTo(clock.instant());       // deterministic thanks to Clock
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PLACED);
+        assertThat(order.getPlacedAt()).isEqualTo(clock.instant());       // deterministic thanks to Clock
         assertThat(order.peekDomainEvents())
                 .singleElement()
                 .isInstanceOfSatisfying(OrderPlaced.class, e -&gt;
@@ -151,8 +151,8 @@ flowchart TB
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">class InMemoryOrderRepository implements OrderRepository {
     private final Map&lt;OrderId, Order&gt; store = new HashMap&lt;&gt;();
     public Optional&lt;Order&gt; findById(OrderId id) { return Optional.ofNullable(store.get(id)); }
-    public List&lt;Order&gt; findRecent(int limit)    { return store.values().stream().limit(limit).toList(); }
-    public Order save(Order o)                  { store.put(o.id(), o); return o; }
+    public List&lt;Order&gt; findRecent(int limit)    { return store.values().stream().limit(limit).collect(toList()); }
+    public Order save(Order o)                  { store.put(o.getId(), o); return o; }
 }
 
 class OrderApplicationServiceTest {
@@ -165,9 +165,9 @@ class OrderApplicationServiceTest {
     @Test
     void place_publishes_order_placed() {
         var view = service.startOrder(new Commands.StartOrder("ada@example.com"));
-        service.addLine(new Commands.AddLine(view.id(), UUID.randomUUID(), 1));
+        service.addLine(new Commands.AddLine(view.getId(), UUID.randomUUID(), 1));
 
-        service.place(view.id());
+        service.place(view.getId());
 
         assertThat(published).hasAtLeastOneElementOfType(OrderPlaced.class);
     }
@@ -180,7 +180,7 @@ class OrderApplicationServiceTest {
 @Import(GlobalExceptionHandler.class)
 class OrderControllerTest {
     @Autowired MockMvc mvc;
-    @MockBean OrderApplicationService orders;     // Spring Boot 3.4+: @MockitoBean
+    @MockBean OrderApplicationService orders;
 
     @Test
     void domain_exception_becomes_409_problem() throws Exception {
@@ -218,8 +218,8 @@ class JpaOrderRepositoryTest {
         orders.save(order);
         em.flush(); em.clear();                         // force a real reload from SQL
 
-        Order loaded = orders.findById(order.id()).orElseThrow();
-        assertThat(loaded.lines()).hasSize(1);
+        Order loaded = orders.findById(order.getId()).orElseThrow();
+        assertThat(loaded.getLines()).hasSize(1);
         assertThat(loaded.total()).isEqualTo(Money.of("109.98", "USD"));
     }
 }</code></pre></div>
@@ -241,13 +241,9 @@ void overselling_rolls_back_the_whole_placement() throws Exception {
 }</code></pre></div>
 
 <h2 id="testcontainers">Testcontainers: test against real PostgreSQL</h2>
-<p>H2 is convenient, but it isn't PostgreSQL. For production fidelity, add Testcontainers. Spring Boot 3.1+ wires the connection for you with <code>@ServiceConnection</code>:</p>
+<p>H2 is convenient, but it isn't PostgreSQL. For production fidelity, add Testcontainers. On Spring Boot 2.7, start the container once per test class and pass its URL to Spring with <code>@DynamicPropertySource</code>. Boot 3.1+ shortens this to <code>@ServiceConnection</code>.</p>
 
-<div class="code"><div class="code-head"><span>XML</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;dependency&gt;
-  &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
-  &lt;artifactId&gt;spring-boot-testcontainers&lt;/artifactId&gt;
-  &lt;scope&gt;test&lt;/scope&gt;
-&lt;/dependency&gt;
+<div class="code"><div class="code-head"><span>XML</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;!-- versions: import org.testcontainers:testcontainers-bom in &lt;dependencyManagement&gt; --&gt;
 &lt;dependency&gt;
   &lt;groupId&gt;org.testcontainers&lt;/groupId&gt;
   &lt;artifactId&gt;postgresql&lt;/artifactId&gt;
@@ -259,18 +255,24 @@ void overselling_rolls_back_the_whole_placement() throws Exception {
   &lt;scope&gt;test&lt;/scope&gt;
 &lt;/dependency&gt;</code></pre></div>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@TestConfiguration(proxyBeanMethods = false)
-class PostgresTestConfig {
-    @Bean @ServiceConnection
-    PostgreSQLContainer&lt;?&gt; postgres() {
-        return new PostgreSQLContainer&lt;&gt;("postgres:16-alpine");
-    }
-}
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@SpringBootTest
+@Testcontainers
+class OrderFlowPostgresTest {
 
-@SpringBootTest
-@Import(PostgresTestConfig.class)
-class OrderFlowPostgresTest { … }</code></pre></div>
-<p>A bonus: <code>SpringApplication.from(ShopApplication::main).with(PostgresTestConfig.class).run(args)</code> in a test-scoped <code>TestShopApplication</code> gives you a dev mode that starts its own database.</p>
+    @Container
+    static final PostgreSQLContainer&lt;?&gt; POSTGRES = new PostgreSQLContainer&lt;&gt;("postgres:16-alpine");
+
+    @DynamicPropertySource
+    static void datasource(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+    }
+
+    @Test
+    void places_an_order_against_real_postgres() { … }
+}</code></pre></div>
+<p>To share one container across many test classes, move the container and the <code>@DynamicPropertySource</code> into an abstract base class that the integration tests extend.</p>
 
 <h2 id="isolation">Test data isolation</h2>
 <table>
@@ -285,7 +287,7 @@ class OrderFlowPostgresTest { … }</code></pre></div>
 
 <h2 id="what-not">What <em>not</em> to test</h2>
 <ul>
-  <li>Getters, records, and Spring Data derived queries with obvious names.</li>
+  <li>Getters, Lombok-generated code, and Spring Data derived queries with obvious names.</li>
   <li>The framework itself (that <code>@Transactional</code> starts a transaction).</li>
   <li>The same rule at four levels. Test it thoroughly in the domain test, and check once that the wiring works.</li>
 </ul>

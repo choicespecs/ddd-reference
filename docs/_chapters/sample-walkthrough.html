@@ -18,7 +18,7 @@ lede: A file-by-file map of the template, a curl cookbook for every endpoint, an
     <tr><td>Domain → integration event translation</td><td><code>ordering/application/IntegrationEventTranslator.java</code></td></tr>
     <tr><td>A policy reacting to another context</td><td><code>catalog/application/StockReservationHandler.java</code></td></tr>
     <tr><td>Thin controller + request DTOs + validation</td><td><code>ordering/web/OrderController.java</code></td></tr>
-    <tr><td>Error mapping to ProblemDetail</td><td><code>config/GlobalExceptionHandler.java</code></td></tr>
+    <tr><td>Error mapping to problem+json</td><td><code>config/GlobalExceptionHandler.java</code>, <code>config/ApiProblem.java</code></td></tr>
     <tr><td>Schema + seed data</td><td><code>resources/db/migration/V1__…</code>, <code>V2__…</code></td></tr>
     <tr><td>Configuration</td><td><code>resources/application.yml</code>, <code>application-postgres.yml</code></td></tr>
     <tr><td>Domain unit tests</td><td><code>test/…/ordering/domain/OrderTest.java</code></td></tr>

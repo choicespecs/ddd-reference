@@ -1,5 +1,7 @@
 -- Schema is owned by Flyway. Never edit an applied migration; add V3__..., V4__... instead.
 -- One table group per bounded context, prefixed with the context name.
+-- Timestamps are plain TIMESTAMP holding UTC (hibernate.jdbc.time_zone=UTC): Hibernate 5 maps
+-- Instant to TIMESTAMP, and ddl-auto=validate would reject TIMESTAMP WITH TIME ZONE.
 
 -- ===== Catalog context =====
 CREATE TABLE catalog_product (
@@ -19,8 +21,8 @@ CREATE TABLE ordering_order (
     id              UUID            PRIMARY KEY,
     customer_email  VARCHAR(320)    NOT NULL,
     status          VARCHAR(16)     NOT NULL,
-    created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
-    placed_at       TIMESTAMP WITH TIME ZONE,
+    created_at      TIMESTAMP NOT NULL,
+    placed_at       TIMESTAMP,
     version         BIGINT          NOT NULL
 );
 

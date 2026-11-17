@@ -76,7 +76,7 @@
 <pre class="mermaid">
 flowchart TB
   A["SQL row&lt;br/&gt;ordering_order + ordering_order_line"] --&gt;|"Hibernate maps rows → objects"| B["Order aggregate&lt;br/&gt;(JPA entity, rich behaviour)"]
-  B --&gt;|"Application service maps → read model"| C["OrderView record&lt;br/&gt;(flat, no behaviour)"]
+  B --&gt;|"Application service maps → read model"| C["OrderView&lt;br/&gt;(immutable, flat, no behaviour)"]
   C --&gt;|"Jackson serializes"| D["JSON over HTTP&lt;br/&gt;{ id, status, lines[], total }"]
   D --&gt;|"fetch() + TypeScript interface"| E["Order (TS type)&lt;br/&gt;in a Vue ref()"]
   E --&gt;|"reactivity re-renders"| F["Table rows, badges, buttons"]
@@ -139,7 +139,7 @@ public OrderView get(UUID orderId) {
 
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/infrastructure/JpaOrderRepository.java  (implements domain port OrderRepository)
 public Optional&lt;Order&gt; findById(OrderId id) {
-    return jpa.findById(id.value());   // Spring Data → EntityManager.find(Order.class, uuid)
+    return jpa.findById(id.getValue());   // Spring Data → EntityManager.find(Order.class, uuid)
 }</code></pre></div>
 
 <div class="code"><div class="code-head"><span>SQL</span><button class="copy" type="button">Copy</button></div><pre><code class="language-sql">-- what Hibernate actually executes (set logging.level.org.hibernate.SQL=DEBUG to see it)
@@ -156,10 +156,10 @@ select l.order_id, l.id, l.product_id, l.product_name, l.quantity,
 
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// ordering/application/OrderView.java
 static OrderView from(Order o) {
-    return new OrderView(o.id().value(), o.customerEmail().value(), o.status().name(),
-            o.lines().stream().map(LineView::from).toList(),
-            o.total().amount(), o.total().currency(),     // total() is computed by the domain
-            o.createdAt(), o.placedAt(), o.version());
+    return new OrderView(o.getId().getValue(), o.getCustomerEmail().getValue(), o.getStatus().name(),
+            o.getLines().stream().map(LineView::from).collect(Collectors.toList()),
+            o.total().getAmount(), o.total().getCurrency(),     // total() is computed by the domain
+            o.getCreatedAt(), o.getPlacedAt(), o.getVersion());
 }</code></pre></div>
 
 <div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">{
@@ -224,10 +224,11 @@ sequenceDiagram
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Domain throws a plain exception, knowing nothing about HTTP
 throw new DomainException("Cannot place an empty order");</code></pre></div>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// config/GlobalExceptionHandler.java maps it to RFC 9457 problem+json
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// config/GlobalExceptionHandler.java maps it to RFC 7807/9457 problem+json (body class: ApiProblem)
 @ExceptionHandler(DomainException.class)
-ProblemDetail ruleViolated(DomainException ex) {
-    return problem(HttpStatus.CONFLICT, "business-rule", "Business rule violated", ex.getMessage());
+ResponseEntity&lt;Object&gt; ruleViolated(DomainException ex, WebRequest request) {
+    return ApiProblem.of(HttpStatus.CONFLICT, "business-rule", "Business rule violated",
+            ex.getMessage(), path(request)).toResponse();
 }</code></pre></div>
 
 <div class="code"><div class="code-head"><span>HTTP</span><button class="copy" type="button">Copy</button></div><pre><code class="language-http">HTTP/1.1 409 Conflict

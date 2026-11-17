@@ -3,12 +3,13 @@ package com.example.shop.ordering.web;
 import com.example.shop.ordering.application.Commands;
 import com.example.shop.ordering.application.OrderApplicationService;
 import com.example.shop.ordering.application.OrderView;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import javax.validation.Valid;
+import javax.validation.constraints.Email;
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import lombok.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,18 +53,18 @@ class OrderController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     OrderView start(@Valid @RequestBody StartOrderRequest req) {
-        return orders.startOrder(new Commands.StartOrder(req.customerEmail()));
+        return orders.startOrder(new Commands.StartOrder(req.getCustomerEmail()));
     }
 
     @PostMapping("/{id}/lines")
     OrderView addLine(@PathVariable UUID id, @Valid @RequestBody AddLineRequest req) {
-        return orders.addLine(new Commands.AddLine(id, req.productId(), req.quantity()));
+        return orders.addLine(new Commands.AddLine(id, req.getProductId(), req.getQuantity()));
     }
 
     @PutMapping("/{id}/lines/{productId}")
     OrderView changeQuantity(@PathVariable UUID id, @PathVariable UUID productId,
                              @Valid @RequestBody ChangeQuantityRequest req) {
-        return orders.changeQuantity(new Commands.ChangeQuantity(id, productId, req.quantity()));
+        return orders.changeQuantity(new Commands.ChangeQuantity(id, productId, req.getQuantity()));
     }
 
     @DeleteMapping("/{id}/lines/{productId}")
@@ -86,9 +87,19 @@ class OrderController {
         return orders.cancel(id);
     }
 
-    record StartOrderRequest(@NotBlank @Email String customerEmail) {}
+    @Value
+    static class StartOrderRequest {
+        @NotBlank @Email String customerEmail;
+    }
 
-    record AddLineRequest(@NotNull UUID productId, @Min(1) @Max(99) int quantity) {}
+    @Value
+    static class AddLineRequest {
+        @NotNull UUID productId;
+        @Min(1) @Max(99) int quantity;
+    }
 
-    record ChangeQuantityRequest(@Min(1) @Max(99) int quantity) {}
+    @Value
+    static class ChangeQuantityRequest {
+        @Min(1) @Max(99) int quantity;
+    }
 }

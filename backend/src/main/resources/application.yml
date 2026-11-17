@@ -18,6 +18,8 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 50   # turns N+1 collection loads into batched IN (...) queries
+        jdbc:
+          time_zone: UTC               # store/read Instant columns as UTC regardless of server zone
         format_sql: true
     show-sql: false
 

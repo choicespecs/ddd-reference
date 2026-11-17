@@ -29,7 +29,7 @@ class CatalogAdapter implements ProductCatalog {
     }
 
     private static OrderableProduct translate(ProductView p) {
-        boolean available = p.active() && p.stockOnHand() > 0;
-        return new OrderableProduct(p.id(), p.name(), new Money(p.price(), p.currency()), available);
+        boolean available = p.isActive() && p.getStockOnHand() > 0;
+        return new OrderableProduct(p.getId(), p.getName(), new Money(p.getPrice(), p.getCurrency()), available);
     }
 }

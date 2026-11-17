@@ -2,13 +2,13 @@ package com.example.shop.ordering.domain;
 
 import com.example.shop.sharedkernel.DomainException;
 import com.example.shop.sharedkernel.Money;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.AttributeOverrides;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import javax.persistence.AttributeOverride;
+import javax.persistence.AttributeOverrides;
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
 import java.util.UUID;
 
@@ -67,9 +67,9 @@ public class OrderLine {
         return unitPrice.times(quantity);
     }
 
-    public UUID id() { return id; }
-    public UUID productId() { return productId; }
-    public String productName() { return productName; }
-    public Money unitPrice() { return unitPrice; }
-    public int quantity() { return quantity; }
+    public UUID getId() { return id; }
+    public UUID getProductId() { return productId; }
+    public String getProductName() { return productName; }
+    public Money getUnitPrice() { return unitPrice; }
+    public int getQuantity() { return quantity; }
 }

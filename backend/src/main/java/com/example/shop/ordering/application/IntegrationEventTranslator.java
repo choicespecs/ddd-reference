@@ -9,6 +9,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Turns Ordering's internal domain events into public integration events (published language).
@@ -25,17 +26,17 @@ class IntegrationEventTranslator {
 
     @EventListener
     void on(OrderPlaced e) {
-        publisher.publishEvent(new OrderPlacedIntegrationEvent(e.orderId().value(), toLines(e.lines())));
+        publisher.publishEvent(new OrderPlacedIntegrationEvent(e.getOrderId().getValue(), toLines(e.getLines())));
     }
 
     @EventListener
     void on(OrderCancelled e) {
-        publisher.publishEvent(new OrderCancelledIntegrationEvent(e.orderId().value(), toLines(e.lines())));
+        publisher.publishEvent(new OrderCancelledIntegrationEvent(e.getOrderId().getValue(), toLines(e.getLines())));
     }
 
     private static List<OrderPlacedIntegrationEvent.Line> toLines(List<OrderPlaced.Line> lines) {
         return lines.stream()
-                .map(l -> new OrderPlacedIntegrationEvent.Line(l.productId(), l.quantity()))
-                .toList();
+                .map(l -> new OrderPlacedIntegrationEvent.Line(l.getProductId(), l.getQuantity()))
+                .collect(Collectors.toList());
     }
 }

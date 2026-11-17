@@ -25,11 +25,11 @@ class StockReservationHandler {
 
     @EventListener
     void on(OrderPlacedIntegrationEvent event) {
-        event.lines().forEach(line -> catalog.reserveStock(line.productId(), line.quantity()));
+        event.getLines().forEach(line -> catalog.reserveStock(line.getProductId(), line.getQuantity()));
     }
 
     @EventListener
     void on(OrderCancelledIntegrationEvent event) {
-        event.lines().forEach(line -> catalog.releaseStock(line.productId(), line.quantity()));
+        event.getLines().forEach(line -> catalog.releaseStock(line.getProductId(), line.getQuantity()));
     }
 }

@@ -73,7 +73,7 @@
         <h2 id="what-this-is">What this repository is</h2>
 <p>This repo has two parts that go together:</p>
 <ol>
-  <li><strong>A small working app</strong>: a shop with two <em>bounded contexts</em> (Catalog and Ordering). It has a Spring Boot 3 backend (Java 17, JPA/Hibernate, Flyway, H2 or PostgreSQL) and a Vue 3 + TypeScript frontend. It is small enough to read in an afternoon but uses every pattern you'll need in a real domain-driven app: aggregates, value objects, repositories, domain events, an anti-corruption layer, and architecture tests.</li>
+  <li><strong>A small working app</strong>: a shop with two <em>bounded contexts</em> (Catalog and Ordering). It has a Spring Boot 2.7 backend (<strong>Java 11</strong>, JPA/Hibernate 5, Flyway, H2 or PostgreSQL) and a Vue 3 + TypeScript frontend. It is small enough to read in an afternoon but uses every pattern you'll need in a real domain-driven app: aggregates, value objects, repositories, domain events, an anti-corruption layer, and architecture tests.</li>
   <li><strong>This guide</strong>: what DDD is, which architecture choices you have, which ones the template makes and why, and how to adapt it for your own app.</li>
 </ol>
 
@@ -151,7 +151,7 @@ npm run dev</code></pre></div>
   <a class="card" href="persistence.html"><strong>Persistence</strong><span>JPA/Hibernate mapping for aggregates, Flyway, locking, N+1.</span></a>
   <a class="card" href="application-layer.html"><strong>Application layer</strong><span>Use cases, transactions, commands, read models.</span></a>
   <a class="card" href="domain-events.html"><strong>Events</strong><span>Domain vs integration events, transaction phases, outbox.</span></a>
-  <a class="card" href="rest-api.html"><strong>REST API</strong><span>Task-based endpoints, validation, ProblemDetail errors.</span></a>
+  <a class="card" href="rest-api.html"><strong>REST API</strong><span>Task-based endpoints, validation, problem+json errors.</span></a>
   <a class="card" href="vue-frontend.html"><strong>Vue frontend</strong><span>Structure, API client, state, forms, types from OpenAPI.</span></a>
   <a class="card" href="testing.html"><strong>Testing</strong><span>Domain unit tests, slices, Testcontainers, ArchUnit.</span></a>
   <a class="card" href="security-config-deploy.html"><strong>Security & deploy</strong><span>Spring Security, profiles, Docker, serving Vue.</span></a>
@@ -160,9 +160,12 @@ npm run dev</code></pre></div>
   <a class="card" href="sample-walkthrough.html"><strong>Sample app tour</strong><span>File map, API cookbook with curl, things to extend.</span></a>
 </div>
 
+<div class="callout warn"><span class="label">Why Spring Boot 2.7?</span>
+<p>The project targets <strong>Java 11</strong>. Spring Boot 3 requires Java 17, so this template uses Spring Boot 2.7, the last line that supports Java 11. That means <code>javax.*</code> imports (not <code>jakarta.*</code>) and Hibernate 5.6. Java 11 has no records, so immutable value classes use Lombok's <code>@Value</code>. Open-source support for Boot 2.7 has ended, so plan to move to Java 17+ and Boot 3 when your platform allows. The <a href="decisions.html#adr-java">decision log</a> lists exactly what changes.</p></div>
+
 <h2 id="repo-layout">Repository layout</h2>
 <div class="tree">ddd-spring-vue-template/
-├── backend/                 Spring Boot app (Maven, Java 17)
+├── backend/                 Spring Boot 2.7 app (Maven, Java 11)
 │   ├── pom.xml
 │   └── src/
 │       ├── main/java/com/example/shop/

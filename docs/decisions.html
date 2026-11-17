@@ -85,13 +85,25 @@ Revisit when: The concrete signal that would change this decision.</code></pre><
 <h2 id="platform">Platform</h2>
 
 <div class="adr" id="adr-java">
-<h3>ADR-001: Java 17 + Spring Boot 3.3 <span class="tag">Accepted</span></h3>
+<h3>ADR-001: Java 11 + Spring Boot 2.7 <span class="tag">Accepted</span></h3>
 <dl>
-  <dt>Context</dt><dd>The project must be Java. We need a mature web/DI/transaction framework with strong JPA support and hiring familiarity.</dd>
+  <dt>Context</dt><dd>The project must be Java, and the target runtime is <strong>Java 11</strong>. We need a mature web/DI/transaction framework with strong JPA support and hiring familiarity.</dd>
   <dt>Options</dt><dd><strong>Spring Boot</strong> (ecosystem, docs, Spring Data, Security), <strong>Quarkus</strong> (fast startup, native images), <strong>Micronaut</strong> (compile-time DI), <strong>Jakarta EE</strong> server.</dd>
-  <dt>Decision</dt><dd>Spring Boot 3.x on Java 17 (LTS, records, sealed types, pattern matching for <code>instanceof</code>).</dd>
-  <dt>Consequences</dt><dd>Records for VOs, commands, and views. Jakarta namespaces (<code>jakarta.persistence</code>).</dd>
-  <dt>Revisit when</dt><dd>Java 21 is available in your runtime: upgrade for virtual threads (<code>spring.threads.virtual.enabled=true</code>), switch pattern matching, and sequenced collections. Changing <code>java.version</code> in the pom is all it takes.</dd>
+  <dt>Decision</dt><dd>Spring Boot <strong>2.7.18</strong>, the last release line that supports Java 11 (Spring Boot 3 requires Java 17). The pom sets <code>maven.compiler.release=11</code>, so the build rejects newer language features and APIs even when compiled on a newer JDK.</dd>
+  <dt>Consequences</dt><dd>
+    <ul>
+      <li><code>javax.persistence</code> / <code>javax.validation</code> (not <code>jakarta.*</code>), Hibernate 5.6, Spring Framework 5.3, Spring Security 5.7, Flyway 8, springdoc 1.x.</li>
+      <li>No records, switch expressions, text blocks or <code>Stream.toList()</code>. Immutable classes use Lombok <code>@Value</code> (<a href="#adr-lombok">ADR-019</a>); streams use <code>Collectors.toList()</code>.</li>
+      <li>No built-in <code>ProblemDetail</code>: the template has its own <code>ApiProblem</code> with the same JSON.</li>
+      <li><strong>Spring Boot 2.7's open-source support has ended</strong> (Nov 2023). No more free security patches; commercial support is available from Broadcom/VMware. Track this as technical debt.</li>
+    </ul></dd>
+  <dt>Revisit when</dt><dd>The runtime allows Java 17+ (do it as soon as possible). The upgrade path:
+    <ol>
+      <li>Set <code>java.version</code> to 17 and the Boot parent to 3.x.</li>
+      <li>Rename <code>javax.persistence</code>/<code>javax.validation</code> → <code>jakarta.*</code>. OpenRewrite's <code>UpgradeSpringBoot_3_0</code> recipe automates most of it.</li>
+      <li>Swap <code>springdoc-openapi-ui</code> for <code>springdoc-openapi-starter-webmvc-ui</code> 2.x; add <code>flyway-database-postgresql</code>.</li>
+      <li>Optionally convert <code>@Value</code> classes to records, replace <code>ApiProblem</code> with Spring's <code>ProblemDetail</code>, and use <code>TIMESTAMPTZ</code> columns.</li>
+    </ol></dd>
 </dl>
 </div>
 
@@ -170,16 +182,16 @@ Revisit when: The concrete signal that would change this decision.</code></pre><
 <dl>
   <dt>Options</dt><dd>(A) Annotate domain classes. (B) Separate JPA entities plus mappers in infrastructure.</dd>
   <dt>Decision</dt><dd>A, with discipline: field access, a protected no-arg constructor, no setters, embeddables for VOs, ID references across aggregates.</dd>
-  <dt>Consequences</dt><dd>Half the persistence code. The domain carries <code>jakarta.persistence</code> imports, which ArchUnit allows explicitly. Some constraints remain (non-final fields).</dd>
+  <dt>Consequences</dt><dd>Half the persistence code. The domain carries <code>javax.persistence</code> imports, which ArchUnit allows explicitly. Some constraints remain (non-final fields).</dd>
   <dt>Revisit when</dt><dd>The schema is legacy or very different from the model, or you need multiple storage technologies. See <a href="persistence.html#option-b">Option B</a>.</dd>
 </dl>
 </div>
 
 <div class="adr" id="adr-ids">
-<h3>ADR-010: UUIDs generated in the domain; typed ID records at the API <span class="tag">Accepted</span></h3>
+<h3>ADR-010: UUIDs generated in the domain; typed ID classes at the API <span class="tag">Accepted</span></h3>
 <dl>
   <dt>Options</dt><dd>DB sequences/identity (<code>@GeneratedValue</code>); UUID v4 assigned in the domain; UUID v7 (time-ordered); typed IDs as <code>@EmbeddedId</code>.</dd>
-  <dt>Decision</dt><dd>UUID v4 created by the factory method, stored as a <code>UUID</code> column, exposed as <code>OrderId</code>/<code>ProductId</code> records from accessors.</dd>
+  <dt>Decision</dt><dd>UUID v4 created by the factory method, stored as a <code>UUID</code> column, exposed as <code>OrderId</code>/<code>ProductId</code> value objects from getters.</dd>
   <dt>Consequences</dt><dd>Aggregates have identity before they're saved (good for events and tests). IDs are safe to expose in URLs (not guessable). Random UUIDs fragment B-tree indexes on very large tables.</dd>
   <dt>Revisit when</dt><dd>Tables have tens of millions of rows: switch to UUID v7 (e.g. the <code>uuid-creator</code> library) for index locality.</dd>
 </dl>
@@ -209,8 +221,19 @@ Revisit when: The concrete signal that would change this decision.</code></pre><
 <h3>ADR-013: Money as a BigDecimal + ISO currency value object <span class="tag">Accepted</span></h3>
 <dl>
   <dt>Options</dt><dd><code>double</code> (never), <code>long</code> cents, <code>BigDecimal</code> + currency VO, JSR 354 (Moneta).</dd>
-  <dt>Decision</dt><dd>A custom <code>Money</code> record (scale 2, HALF_EVEN), stored as <code>NUMERIC(19,2)</code> plus a currency column.</dd>
+  <dt>Decision</dt><dd>A custom <code>Money</code> embeddable value object (scale 2, HALF_EVEN), stored as <code>NUMERIC(19,2)</code> plus a currency column.</dd>
   <dt>Revisit when</dt><dd>You need currencies with 0 or 3 decimals (JPY, KWD) or currency conversion: use <code>Currency.getDefaultFractionDigits()</code> for the scale, or adopt Moneta.</dd>
+</dl>
+</div>
+
+<div class="adr" id="adr-lombok">
+<h3>ADR-019: Lombok <code>@Value</code> for immutable value classes <span class="tag">Accepted</span></h3>
+<dl>
+  <dt>Context</dt><dd>Java 11 has no records. The template has about 25 small immutable types: typed IDs, value objects, commands, views, events and request DTOs. Hand-writing constructors, getters, <code>equals</code>, <code>hashCode</code> and <code>toString</code> for each is about 40 lines of boilerplate apiece, and it's easy to get wrong when a field is added.</dd>
+  <dt>Options</dt><dd>(A) Hand-written classes (IDE-generated). (B) Lombok <code>@Value</code>. (C) Immutables / AutoValue (annotation processors that generate separate implementation classes).</dd>
+  <dt>Decision</dt><dd>Lombok <code>@Value</code>. Where validation is needed (IDs, <code>Sku</code>, <code>CustomerEmail</code>), write an explicit constructor and Lombok generates the rest. <code>backend/lombok.config</code> adds <code>@ConstructorProperties</code> so Jackson can deserialize request DTOs. JPA classes (<code>Money</code>, entities) stay hand-written, because Hibernate needs no-arg constructors and non-final fields.</dd>
+  <dt>Consequences</dt><dd>It's compile-time only and absent from the runtime JAR and from bytecode references (ArchUnit's domain rule still passes). Accessors are JavaBean-style <code>getX()</code>. IDEs need the Lombok plugin (built into IntelliJ; VS Code's Java extension supports it).</dd>
+  <dt>Revisit when</dt><dd>You move to Java 17: records replace almost all <code>@Value</code> classes.</dd>
 </dl>
 </div>
 
@@ -220,7 +243,7 @@ Revisit when: The concrete signal that would change this decision.</code></pre><
 <h3>ADR-014: PostgreSQL in real environments; H2 for zero-setup local runs <span class="tag">Accepted</span></h3>
 <dl>
   <dt>Decision</dt><dd>H2 in PostgreSQL mode as the default profile, so <code>./mvnw spring-boot:run</code> just works. A <code>postgres</code> profile plus Docker Compose for realistic development.</dd>
-  <dt>Revisit when</dt><dd>You start using Postgres-specific features (JSONB, <code>SKIP LOCKED</code>, partial indexes). Then drop H2 and use Testcontainers plus <code>spring-boot-docker-compose</code>.</dd>
+  <dt>Revisit when</dt><dd>You start using Postgres-specific features (JSONB, <code>SKIP LOCKED</code>, partial indexes). Then drop H2 and use Testcontainers in tests and Docker Compose locally.</dd>
 </dl>
 </div>
 
@@ -236,10 +259,10 @@ Revisit when: The concrete signal that would change this decision.</code></pre><
 <h2 id="api">API &amp; frontend</h2>
 
 <div class="adr" id="adr-api-style">
-<h3>ADR-016: Task-based REST with ProblemDetail errors <span class="tag">Accepted</span></h3>
+<h3>ADR-016: Task-based REST with problem+json errors <span class="tag">Accepted</span></h3>
 <dl>
   <dt>Options</dt><dd>CRUD REST; task-based REST; GraphQL; gRPC.</dd>
-  <dt>Decision</dt><dd>REST with command sub-resources (<code>/place</code>, <code>/cancel</code>), read models as responses, and RFC 9457 errors. OpenAPI generated with springdoc.</dd>
+  <dt>Decision</dt><dd>REST with command sub-resources (<code>/place</code>, <code>/cancel</code>), read models as responses, and RFC 7807/9457 problem+json errors (via <code>ApiProblem</code>). OpenAPI generated with springdoc 1.x.</dd>
   <dt>Revisit when</dt><dd>Many different clients need very different shapes of the same data: consider GraphQL (Spring for GraphQL) for the read side.</dd>
 </dl>
 </div>

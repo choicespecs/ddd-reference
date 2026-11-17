@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Use cases of the Ordering context. Each public method is one transaction and follows the
@@ -43,30 +44,30 @@ public class OrderApplicationService {
     }
 
     public OrderView startOrder(Commands.StartOrder cmd) {
-        Order order = Order.startDraft(new CustomerEmail(cmd.customerEmail()), clock);
+        Order order = Order.startDraft(new CustomerEmail(cmd.getCustomerEmail()), clock);
         return saveAndPublish(order);
     }
 
     public OrderView addLine(Commands.AddLine cmd) {
-        Order order = load(cmd.orderId());
-        ProductCatalog.OrderableProduct product = catalog.find(cmd.productId())
-                .orElseThrow(() -> new NotFoundException("Product", cmd.productId()));
-        if (!product.available()) {
-            throw new DomainException("Product " + product.name() + " is not available");
+        Order order = load(cmd.getOrderId());
+        ProductCatalog.OrderableProduct product = catalog.find(cmd.getProductId())
+                .orElseThrow(() -> new NotFoundException("Product", cmd.getProductId()));
+        if (!product.isAvailable()) {
+            throw new DomainException("Product " + product.getName() + " is not available");
         }
-        order.addLine(product.productId(), product.name(), product.price(), cmd.quantity());
+        order.addLine(product.getProductId(), product.getName(), product.getPrice(), cmd.getQuantity());
         return saveAndPublish(order);
     }
 
     public OrderView changeQuantity(Commands.ChangeQuantity cmd) {
-        Order order = load(cmd.orderId());
-        order.changeQuantity(cmd.productId(), cmd.quantity());
+        Order order = load(cmd.getOrderId());
+        order.changeQuantity(cmd.getProductId(), cmd.getQuantity());
         return saveAndPublish(order);
     }
 
     public OrderView removeLine(Commands.RemoveLine cmd) {
-        Order order = load(cmd.orderId());
-        order.removeLine(cmd.productId());
+        Order order = load(cmd.getOrderId());
+        order.removeLine(cmd.getProductId());
         return saveAndPublish(order);
     }
 
@@ -95,7 +96,7 @@ public class OrderApplicationService {
 
     @Transactional(readOnly = true)
     public List<OrderView> recent(int limit) {
-        return orders.findRecent(limit).stream().map(OrderView::from).toList();
+        return orders.findRecent(limit).stream().map(OrderView::from).collect(Collectors.toList());
     }
 
     private Order load(UUID orderId) {

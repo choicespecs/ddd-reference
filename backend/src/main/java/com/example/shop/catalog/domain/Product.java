@@ -3,13 +3,13 @@ package com.example.shop.catalog.domain;
 import com.example.shop.sharedkernel.AggregateRoot;
 import com.example.shop.sharedkernel.DomainException;
 import com.example.shop.sharedkernel.Money;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.AttributeOverrides;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import javax.persistence.AttributeOverride;
+import javax.persistence.AttributeOverrides;
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -61,8 +61,8 @@ public class Product extends AggregateRoot {
     }
 
     private Product(ProductId id, Sku sku, String name, String description, Money price, int initialStock) {
-        this.id = id.value();
-        this.sku = sku.value();
+        this.id = id.getValue();
+        this.sku = sku.getValue();
         rename(name);
         this.description = description;
         this.price = Objects.requireNonNull(price, "price");
@@ -112,13 +112,13 @@ public class Product extends AggregateRoot {
         this.active = false;
     }
 
-    // ---- read accessors (no setters) -------------------------------------
+    // ---- read accessors (getters only — no setters) ----------------------
 
-    public ProductId id() { return new ProductId(id); }
-    public Sku sku() { return new Sku(sku); }
-    public String name() { return name; }
-    public String description() { return description; }
-    public Money price() { return price; }
-    public int stockOnHand() { return stockOnHand; }
+    public ProductId getId() { return new ProductId(id); }
+    public Sku getSku() { return new Sku(sku); }
+    public String getName() { return name; }
+    public String getDescription() { return description; }
+    public Money getPrice() { return price; }
+    public int getStockOnHand() { return stockOnHand; }
     public boolean isActive() { return active; }
 }

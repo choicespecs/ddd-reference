@@ -1,6 +1,7 @@
 package com.example.shop.ordering.application;
 
 import com.example.shop.sharedkernel.Money;
+import lombok.Value;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -15,5 +16,11 @@ public interface ProductCatalog {
 
     Optional<OrderableProduct> find(UUID productId);
 
-    record OrderableProduct(UUID productId, String name, Money price, boolean available) {}
+    @Value
+    class OrderableProduct {
+        UUID productId;
+        String name;
+        Money price;
+        boolean available;
+    }
 }

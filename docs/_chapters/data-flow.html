@@ -9,7 +9,7 @@ lede: How rows in the database become things on the Vue page and back again. One
 ```mermaid
 flowchart TB
   A["SQL row<br/>ordering_order + ordering_order_line"] -->|"Hibernate maps rows → objects"| B["Order aggregate<br/>(JPA entity, rich behaviour)"]
-  B -->|"Application service maps → read model"| C["OrderView record<br/>(flat, no behaviour)"]
+  B -->|"Application service maps → read model"| C["OrderView<br/>(immutable, flat, no behaviour)"]
   C -->|"Jackson serializes"| D["JSON over HTTP<br/>{ id, status, lines[], total }"]
   D -->|"fetch() + TypeScript interface"| E["Order (TS type)<br/>in a Vue ref()"]
   E -->|"reactivity re-renders"| F["Table rows, badges, buttons"]
@@ -83,7 +83,7 @@ public OrderView get(UUID orderId) {
 ```java
 // ordering/infrastructure/JpaOrderRepository.java  (implements domain port OrderRepository)
 public Optional<Order> findById(OrderId id) {
-    return jpa.findById(id.value());   // Spring Data → EntityManager.find(Order.class, uuid)
+    return jpa.findById(id.getValue());   // Spring Data → EntityManager.find(Order.class, uuid)
 }
 ```
 
@@ -104,10 +104,10 @@ select l.order_id, l.id, l.product_id, l.product_name, l.quantity,
 ```java
 // ordering/application/OrderView.java
 static OrderView from(Order o) {
-    return new OrderView(o.id().value(), o.customerEmail().value(), o.status().name(),
-            o.lines().stream().map(LineView::from).toList(),
-            o.total().amount(), o.total().currency(),     // total() is computed by the domain
-            o.createdAt(), o.placedAt(), o.version());
+    return new OrderView(o.getId().getValue(), o.getCustomerEmail().getValue(), o.getStatus().name(),
+            o.getLines().stream().map(LineView::from).collect(Collectors.toList()),
+            o.total().getAmount(), o.total().getCurrency(),     // total() is computed by the domain
+            o.getCreatedAt(), o.getPlacedAt(), o.getVersion());
 }
 ```
 
@@ -178,10 +178,11 @@ throw new DomainException("Cannot place an empty order");
 ```
 
 ```java
-// config/GlobalExceptionHandler.java maps it to RFC 9457 problem+json
+// config/GlobalExceptionHandler.java maps it to RFC 7807/9457 problem+json (body class: ApiProblem)
 @ExceptionHandler(DomainException.class)
-ProblemDetail ruleViolated(DomainException ex) {
-    return problem(HttpStatus.CONFLICT, "business-rule", "Business rule violated", ex.getMessage());
+ResponseEntity<Object> ruleViolated(DomainException ex, WebRequest request) {
+    return ApiProblem.of(HttpStatus.CONFLICT, "business-rule", "Business rule violated",
+            ex.getMessage(), path(request)).toResponse();
 }
 ```
 

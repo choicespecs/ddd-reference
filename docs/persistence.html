@@ -74,7 +74,7 @@
 <table>
   <thead><tr><th>Name</th><th>What it is</th><th>You touch it via</th></tr></thead>
   <tbody>
-    <tr><td><strong>JPA</strong> (Jakarta Persistence)</td><td>A <em>specification</em>: annotations (<code>@Entity</code>, <code>@Id</code>) and the <code>EntityManager</code> API</td><td><code>jakarta.persistence.*</code> imports</td></tr>
+    <tr><td><strong>JPA</strong> (Jakarta Persistence)</td><td>A <em>specification</em>: annotations (<code>@Entity</code>, <code>@Id</code>) and the <code>EntityManager</code> API</td><td><code>javax.persistence.*</code> imports (Spring Boot 2.x / JPA 2.2; Boot 3 renamed them to <code>jakarta.persistence.*</code>)</td></tr>
     <tr><td><strong>Hibernate ORM</strong></td><td>The <em>implementation</em> of JPA that Spring Boot uses by default. It generates SQL, tracks changes, and handles caching.</td><td>Mostly invisible; <code>hibernate.*</code> properties</td></tr>
     <tr><td><strong>Spring Data JPA</strong></td><td>Generates repository implementations from interfaces (<code>findBySku</code>)</td><td><code>JpaRepository</code> interfaces</td></tr>
     <tr><td><strong>Flyway</strong></td><td>Versioned SQL migrations that create and evolve the schema</td><td><code>db/migration/V1__*.sql</code></td></tr>
@@ -120,7 +120,7 @@ class OrderEntity {
 
 // ordering/infrastructure/JpaOrderRepository.java
 public Order save(Order order) {
-    OrderEntity entity = jpa.findById(order.id().value()).orElseGet(OrderEntity::new);
+    OrderEntity entity = jpa.findById(order.getId().getValue()).orElseGet(OrderEntity::new);
     mapper.copyInto(order, entity);     // domain → entity
     return mapper.toDomain(jpa.save(entity));
 }</code></pre></div>
@@ -145,7 +145,7 @@ public Order save(Order order) {
   <li><strong>Protected no-arg constructor</strong> for Hibernate, and a private or package-private "real" constructor called from a factory.</li>
   <li><strong>Assign IDs in the domain.</strong> Use <code>UUID.randomUUID()</code> in the constructor, with no <code>@GeneratedValue</code>. The entity is complete before it's saved, and <code>save()</code> does a <code>merge</code> that first SELECTs to check whether the row exists. If that extra SELECT matters, implement <code>Persistable&lt;UUID&gt;</code> with an <code>isNew()</code> flag.</li>
   <li><strong>Enums as STRING.</strong> <code>@Enumerated(EnumType.STRING)</code>. Never use <code>ORDINAL</code>: reordering the enum would silently corrupt your data.</li>
-  <li><strong>Value objects as <code>@Embeddable</code></strong> (records work in Hibernate 6.2+), or as an <code>AttributeConverter</code> for single-column VOs.</li>
+  <li><strong>Value objects as <code>@Embeddable</code></strong> classes, or as an <code>AttributeConverter</code> for single-column VOs. Hibernate 5.6 needs a no-arg constructor (it can be <code>protected</code>) and non-final fields on embeddables, which is why <code>Money</code> is hand-written rather than a Lombok <code>@Value</code>.</li>
   <li><strong>Cross-aggregate references by ID</strong>: a plain <code>UUID productId</code> column, not <code>@ManyToOne Product</code>.</li>
   <li><strong>Aggregate-internal collections</strong>: unidirectional <code>@OneToMany</code> with <code>cascade = ALL, orphanRemoval = true</code>, owned by the root.</li>
   <li><strong>Optimistic locking on every root</strong>: a <code>@Version</code> field (in <code>AggregateRoot</code> here).</li>
@@ -155,8 +155,13 @@ public Order save(Order order) {
 
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Multi-column VO → @Embeddable; rename columns per use with @AttributeOverride
 @Embeddable
-public record Money(@Column(name = "amount") BigDecimal amount,
-                    @Column(name = "currency") String currency) { … }
+public class Money {
+    @Column(name = "amount")   private BigDecimal amount;
+    @Column(name = "currency") private String currency;
+    protected Money() {}                       // required by Hibernate 5
+    public Money(BigDecimal amount, String currency) { … validate … }
+    …
+}
 
 @Embedded
 @AttributeOverrides({
@@ -168,7 +173,7 @@ private Money unitPrice;</code></pre></div>
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Single-column VO → AttributeConverter; the entity field can then be the VO type itself
 @Converter(autoApply = true)
 public class SkuConverter implements AttributeConverter&lt;Sku, String&gt; {
-    public String convertToDatabaseColumn(Sku sku)  { return sku == null ? null : sku.value(); }
+    public String convertToDatabaseColumn(Sku sku)  { return sku == null ? null : sku.getValue(); }
     public Sku convertToEntityAttribute(String raw) { return raw == null ? null : new Sku(raw); }
 }
 
@@ -177,7 +182,7 @@ private Sku sku;           // instead of String sku + conversion in the getter</
 <p>The template stores <code>String sku</code> and converts in the accessor, which is simple and explicit. A converter is cleaner once you have many such fields. Note that Spring Data derived queries then take the VO: <code>findBySku(Sku sku)</code>.</p>
 
 <h3 id="typed-ids">Typed IDs and JPA</h3>
-<p>Mapping <code>OrderId</code> as the <code>@Id</code> type is possible (<code>@EmbeddedId</code> with an <code>@Embeddable</code> record, or Hibernate's <code>@JavaType</code>), but it adds friction with Spring Data's generic <code>JpaRepository&lt;Order, OrderId&gt;</code> and with JPQL. The template stores a raw <code>UUID</code> and exposes <code>OrderId</code> from the accessor. You get type safety at the API, and the plumbing stays simple.</p>
+<p>Mapping <code>OrderId</code> as the <code>@Id</code> type is possible (<code>@EmbeddedId</code> with an <code>@Embeddable</code> ID class that implements <code>Serializable</code>), but it adds friction with Spring Data's generic <code>JpaRepository&lt;Order, OrderId&gt;</code> and with JPQL. The template stores a raw <code>UUID</code> and exposes <code>OrderId</code> from the accessor. You get type safety at the API, and the plumbing stays simple.</p>
 
 <h2 id="collections">Aggregate collections in depth</h2>
 
@@ -233,8 +238,8 @@ public abstract class AggregateRoot {
 <p>If the <code>WHERE … version = 5</code> matches 0 rows, Hibernate throws <code>OptimisticLockException</code>. Spring wraps it as <code>ObjectOptimisticLockingFailureException</code>, and <code>GlobalExceptionHandler</code> maps that to <strong>409 Conflict</strong> with "reload and try again". The <code>version</code> is also returned in <code>OrderView</code>. To catch conflicts across separate HTTP requests (where the user edited stale data), have the client send the version back, either in an <code>If-Match</code> header or in the body, and compare it before applying the command:</p>
 
 <div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public OrderView addLine(AddLine cmd) {
-    Order order = load(cmd.orderId());
-    if (cmd.expectedVersion() != null &amp;&amp; cmd.expectedVersion() != order.version())
+    Order order = load(cmd.getOrderId());
+    if (cmd.getExpectedVersion() != null &amp;&amp; cmd.getExpectedVersion() != order.getVersion())
         throw new ConcurrentModificationException("Order was changed by someone else");
     …
 }</code></pre></div>
@@ -274,7 +279,7 @@ ALTER TABLE ordering_order ADD COLUMN notes VARCHAR(1000);</code></pre></div>
   <li><strong>No foreign keys across contexts.</strong> <code>ordering_order_line.product_id</code> has no FK to <code>catalog_product</code>. Contexts must be able to live in separate databases one day.</li>
   <li><strong>FKs and CHECK constraints <em>within</em> a context</strong> as a second line of defence (<code>stock_on_hand &gt;= 0</code>).</li>
   <li><strong>Money</strong> stored as <code>NUMERIC(19,2)</code> plus a currency code, never as <code>FLOAT</code>/<code>DOUBLE</code>.</li>
-  <li><strong>Timestamps</strong> as <code>TIMESTAMP WITH TIME ZONE</code>, mapped to <code>Instant</code>.</li>
+  <li><strong>Timestamps</strong> as <code>TIMESTAMP</code> holding UTC, mapped to <code>Instant</code>, with <code>hibernate.jdbc.time_zone: UTC</code> so the JVM's time zone never matters. (Hibernate 5 maps <code>Instant</code> to <code>TIMESTAMP</code>, and <code>ddl-auto: validate</code> rejects a <code>TIMESTAMP WITH TIME ZONE</code> column. Hibernate 6 / Boot 3 can use <code>TIMESTAMPTZ</code> directly.)</li>
 </ul>
 
 <h2 id="open-in-view">Turn off open-in-view</h2>
@@ -290,7 +295,7 @@ ALTER TABLE ordering_order ADD COLUMN notes VARCHAR(1000);</code></pre></div>
     <tr><td>Use for</td><td>Quick start, demos</td><td>Real development; Testcontainers for integration tests</td></tr>
   </tbody>
 </table>
-<p>For a real project, many teams drop H2 entirely and use Testcontainers PostgreSQL in tests plus Docker Compose locally. Spring Boot 3.1+ can even start the compose file for you via <code>spring-boot-docker-compose</code>. See <a href="testing.html#testcontainers">Testing</a>.</p>
+<p>For a real project, many teams drop H2 entirely and use Testcontainers PostgreSQL in tests plus Docker Compose locally. (On Spring Boot 3.1+, <code>spring-boot-docker-compose</code> can even start the compose file for you. On 2.7, run <code>docker compose up -d</code> yourself.) See <a href="testing.html#testcontainers">Testing</a>.</p>
 
 <h2 id="useful-properties">Useful properties</h2>
 
@@ -301,6 +306,7 @@ ALTER TABLE ordering_order ADD COLUMN notes VARCHAR(1000);</code></pre></div>
     properties:
       hibernate:
         default_batch_fetch_size: 50
+        jdbc.time_zone: UTC               # Instant &lt;-&gt; TIMESTAMP always in UTC
         jdbc.batch_size: 50               # batch INSERT/UPDATE statements
         order_inserts: true
         order_updates: true
@@ -308,7 +314,7 @@ ALTER TABLE ordering_order ADD COLUMN notes VARCHAR(1000);</code></pre></div>
 logging:
   level:
     org.hibernate.SQL: DEBUG                         # print SQL
-    org.hibernate.orm.jdbc.bind: TRACE               # print bound parameter values</code></pre></div>
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE   # print bound parameter values (Hibernate 5)</code></pre></div>
         <nav class="pager" aria-label="Previous and next"><a class="prev" href="project-structure.html"><small>← Previous</small>Project structure</a><a class="next" href="application-layer.html"><small>Next →</small>Application layer &amp; use cases</a></nav>
       </article>
       <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
