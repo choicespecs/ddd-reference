@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A single, precise vocabulary that domain experts and developers share. You use it in conversation, in documents, and in the code itself.">
-<title>Ubiquitous language — DDD Reference</title>
+<meta name="description" content="When the UI is generated from your classes, every class, field and method name is something a user will read. DDD&#x27;s ubiquitous language stops being good advice and becomes a requirement.">
+<title>Names become the UI — Domain-Driven UI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -17,41 +17,37 @@
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
   <nav class="rail" id="rail" aria-label="Chapters">
-    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="brand" href="index.html">Domain-Driven UI</a>
     <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
     <div class="search">
       <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
       <ol id="search-results" hidden></ol>
     </div>
     <div class="nav-group">Start</div><ol>
-<li><a href="index.html">Domain-Driven Design, explained</a></li>
-<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
 <li><a href="running-example.html">The running example</a></li>
 </ol>
-<div class="nav-group">Strategic design</div><ol>
-<li><a href="ubiquitous-language.html" aria-current="page" class="on">Ubiquitous language</a></li>
-<li><a href="subdomains.html">Subdomains</a></li>
-<li><a href="discovery.html">Discovering the domain</a></li>
-<li><a href="bounded-contexts.html">Bounded contexts</a></li>
-<li><a href="context-mapping.html">Context mapping</a></li>
-</ol>
-<div class="nav-group">Tactical design</div><ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html" aria-current="page" class="on">Names become the UI</a></li>
 <li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
 <li><a href="aggregates.html">Aggregates</a></li>
-<li><a href="domain-events.html">Domain events</a></li>
-<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
-<li><a href="services.html">Domain &amp; application services</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
 </ol>
-<div class="nav-group">Architecture</div><ol>
-<li><a href="architecture.html">Architecture for a domain model</a></li>
-<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
-<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
 </ol>
 <div class="nav-group">Practice</div><ol>
-<li><a href="testing.html">Testing the model</a></li>
-<li><a href="anti-patterns.html">Anti-patterns</a></li>
-<li><a href="legacy.html">DDD in legacy systems</a></li>
-<li><a href="checklist.html">Design checklist</a></li>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
 </ol>
 <div class="nav-group">Reference</div><ol>
 <li><a href="glossary.html">Glossary</a></li>
@@ -61,75 +57,85 @@
   <div class="main-wrap">
     <header class="topbar">
       <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
-      <span class="crumbs"><a href="index.html">Guide</a> / Strategic design</span>
+      <span class="crumbs"><a href="index.html">Guide</a> / Modelling the objects</span>
       <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
     </header>
     <main id="content">
       <article>
         <header class="chapter-head">
-          <span class="eyebrow">Strategic design</span>
-          <h1>Ubiquitous language</h1>
-          <p class="lede">A single, precise vocabulary that domain experts and developers share. You use it in conversation, in documents, and in the code itself.</p>
+          <span class="eyebrow">Modelling the objects</span>
+          <h1>Names become the UI</h1>
+          <p class="lede">When the UI is generated from your classes, every class, field and method name is something a user will read. DDD's ubiquitous language stops being good advice and becomes a requirement.</p>
         </header>
-        <h2 id="definition">Definition</h2>
+        <h2 id="definition">Ubiquitous language, briefly</h2>
 <dl class="def">
   <dt>Ubiquitous language</dt>
-  <dd>The language the team builds around the domain model, used by everyone on the team in every activity. "Ubiquitous" means everywhere: whiteboards, tickets, tests, class names, method names, database tables and API fields.</dd>
+  <dd>A precise vocabulary that developers and business experts build together and use everywhere: in conversation, in documents, and in code. The term comes from domain-driven design.</dd>
 </dl>
-<p>Without one, every conversation goes through a translation step. An expert says "release the hold", a developer hears "set <code>status = 3</code>", and somewhere in that translation a rule gets lost. With one, the expert could read the method name <code>hold.release()</code> and nod.</p>
+<p>In a hand-built UI, a developer can name a field <code>stsCd</code> and label it "Status" in the form. The names in the code and on the screen are separate. In a generated UI they're the same name: <strong>whatever is in the code is what the user sees</strong>.</p>
 
-<h2 id="from-talk-to-code">From conversation to code</h2>
-<p>Listen for the <strong>nouns</strong> (candidate entities and value objects), the <strong>verbs</strong> (commands and behaviour), the <strong>past-tense phrases</strong> (domain events) and the <strong>rules</strong> (invariants and policies).</p>
-<blockquote>"When a buyer <u>places a hold</u> on seats, those seats are <u>unavailable</u> to anyone else until the hold <u>expires</u> or is <u>converted into an order</u>. A buyer can't hold more than the event's <u>purchase limit</u>."</blockquote>
-
-<div class="compare">
-  <div class="bad">
-    <h4>Translated (lossy)</h4>
-
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">seatService.updateStatus(seatIds, 2, userId);
-if (count(userId) &gt; cfg.getMax()) throw new Ex("too many");
-reservationRepo.save(new Reservation(userId, seatIds, now + 600_000));</code></pre></div>
-  </div>
-  <div class="good">
-    <h4>Ubiquitous</h4>
-
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">Hold hold = event.placeHold(buyer, seats, clock);
-// throws PurchaseLimitExceeded
-...
-hold.convertToOrder(payment);
-hold.expire();</code></pre></div>
-  </div>
-</div>
-
-<h2 id="building-it">Building the language</h2>
-<ul>
-  <li><strong>Work from concrete scenarios, not abstractions.</strong> "Walk me through what happens when someone's card is declined during an on-sale" gets better language than "describe your entities."</li>
-  <li><strong>Push back on vague words.</strong> When someone says "process", "handle", "manage" or "data", ask what <em>actually</em> happens.</li>
-  <li><strong>Resolve synonyms.</strong> If "reservation", "hold" and "block" mean the same thing, agree on one and retire the others. If they mean <em>different</em> things, you've just found a concept.</li>
-  <li><strong>Notice homonyms.</strong> If "ticket" means two different things to two groups, that's usually a <a href="bounded-contexts.html">context boundary</a>, not a naming problem.</li>
-  <li><strong>Write a glossary per context</strong>, keep it short, and put it next to the code (a <code>GLOSSARY.md</code> in the module). Prune it actively.</li>
-  <li><strong>Rename code when the language changes.</strong> A stale name in code makes the old misunderstanding permanent. IDE refactorings make renaming cheap, so do it.</li>
-</ul>
-
-<h2 id="fieldhouse-glossary">Example: Sales context glossary</h2>
+<h2 id="names-to-labels">How names become labels</h2>
+<p>A metamodel builder derives labels from names using a simple convention, and annotations override it where needed:</p>
 <table>
-  <thead><tr><th>Term</th><th>Meaning in Sales</th><th>Not to be confused with</th></tr></thead>
+  <thead><tr><th>Code</th><th>Derived label</th><th>Shown as</th></tr></thead>
   <tbody>
-    <tr><td>On-sale</td><td>The moment from which an event's tickets may be held and bought</td><td>"Sale" as a discount</td></tr>
-    <tr><td>Hold</td><td>A time-limited claim by one buyer on specific seats; expires after 10 minutes</td><td>An order (a hold has no payment yet)</td></tr>
-    <tr><td>Purchase limit</td><td>Max seats one buyer may hold or own for an event, across all orders</td><td>Venue capacity</td></tr>
-    <tr><td>Order</td><td>A paid, confirmed purchase created from exactly one hold</td><td>A cart (not a Sales concept at all)</td></tr>
-    <tr><td>Ticket</td><td>A line on an order: one seat at one price tier</td><td>Admission's "ticket", a scannable pass</td></tr>
+    <tr><td>class <code>PriceTier</code></td><td>"Price Tier" / plural "Price Tiers"</td><td>Page title, menu entry</td></tr>
+    <tr><td>field <code>onSaleAt</code></td><td>"On Sale At"</td><td>Form label (override: "On-sale opens")</td></tr>
+    <tr><td>method <code>addTier(…)</code></td><td>"Add Tier"</td><td>Button (override: "Add price tier")</td></tr>
+    <tr><td>parameter <code>capacity</code></td><td>"Capacity"</td><td>Dialog field</td></tr>
+    <tr><td>enum <code>ON_SALE</code></td><td>"On Sale"</td><td>Dropdown option / badge</td></tr>
   </tbody>
 </table>
 
-<h2 id="pitfalls">Pitfalls</h2>
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">static String humanise(String identifier) {
+    // "onSaleAt" → "On Sale At", "ON_SALE" → "On Sale"
+    String spaced = identifier.contains("_")
+        ? identifier.toLowerCase().replace('_', ' ')
+        : identifier.replaceAll("([a-z0-9])([A-Z])", "$1 $2");
+    return Arrays.stream(spaced.split(" "))
+        .map(w -&gt; Character.toUpperCase(w.charAt(0)) + w.substring(1).toLowerCase())
+        .collect(Collectors.joining(" "));
+}</code></pre></div>
+<p>Note that <code>humanise()</code> needs parameter names at runtime, so compile Java with <code>-parameters</code>. Otherwise you get <code>arg0</code>, <code>arg1</code>.</p>
+
+<h2 id="before-after">Technical names make an unusable UI</h2>
+<div class="compare">
+  <div class="bad">
+    <h4>Technical names</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">class EvtRec {
+  String nm;
+  int stsCd;
+  void updStatus(int c) { … }
+  void process() { … }
+}</code></pre></div>
+<p>The UI shows "Evt Rec", "Nm", "Sts Cd", and buttons labelled "Upd Status" and "Process".</p>
+  </div>
+  <div class="good">
+    <h4>Domain names</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">class Event {
+  String name;
+  EventStatus status;
+  void publish() { … }
+  void cancel(String reason) { … }
+}</code></pre></div>
+<p>The UI shows "Event", "Name", "Status", and buttons labelled "Publish" and "Cancel". It reads the way staff talk.</p>
+  </div>
+</div>
+
+<h2 id="behaviour-names">Name behaviour after business operations</h2>
+<p>Generic verbs such as <code>update</code>, <code>process</code>, <code>handle</code> and <code>setStatus</code> become meaningless buttons. Name each action after what the business calls it: <em>publish</em>, <em>release hold</em>, <em>refund order</em>, <em>add price tier</em>. If nobody can name an action in business terms, the model is probably missing a concept.</p>
+
+<h2 id="practical">Practical rules</h2>
 <ul>
-  <li><strong>Developer jargon leaking in</strong>: <code>SeatDTO</code>, <code>HoldManager</code>, <code>processReservationData()</code>. Technical names belong in the infrastructure layer, not in the domain model.</li>
-  <li><strong>Forcing one language on the whole company</strong>: the language is ubiquitous <em>within a bounded context</em>, not across the organisation. Marketing and Admission are allowed to mean different things by "ticket".</li>
-  <li><strong>Treating it as documentation</strong>: the language lives in conversations and code. A glossary that nobody updates is a museum.</li>
+  <li><strong>Agree on terms with the people who use the screens.</strong> Show them the generated UI early. It's the fastest way to check the language, because they react to the words directly.</li>
+  <li><strong>Resolve synonyms.</strong> If "hold", "reservation" and "block" all appear, pick one, rename the class, and the UI follows.</li>
+  <li><strong>Override labels sparingly.</strong> If you need a label override everywhere, the code name is wrong, so rename it. Keep overrides for punctuation and casing ("On-sale opens").</li>
+  <li><strong>Treat renames as UI changes.</strong> Renaming a field changes the screen, and possibly the API and JSON metadata. Review renames the way you'd review copy changes.</li>
+  <li><strong>Localise through keys, not code.</strong> For multiple languages, derive a key from the name (<code>Event.onSaleAt</code>) and look up translations. The code name stays the canonical term.</li>
 </ul>
-        <nav class="pager" aria-label="Previous and next"><a class="prev" href="running-example.html"><small>← Previous</small>The running example</a><a class="next" href="subdomains.html"><small>Next →</small>Subdomains</a></nav>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="running-example.html"><small>← Previous</small>The running example</a><a class="next" href="entities-value-objects.html"><small>Next →</small>Entities &amp; value objects</a></nav>
         <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/ubiquitous-language.html">Edit this page on GitHub</a>.</footer>
       </article>
       <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>

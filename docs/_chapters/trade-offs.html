@@ -1,0 +1,81 @@
+---
+title: Trade-offs
+lede: When a model-driven UI is a big win, when it gets in the way, and the security and performance issues to design for from the start.
+---
+
+<h2 id="fit">Where it fits</h2>
+<div class="compare">
+  <div class="good">
+    <h4>Strong fit</h4>
+    <ul>
+      <li>Back-office, internal and expert tools: administration, operations, case management</li>
+      <li>Many entity types with lots of rules (insurance, ticketing, logistics, government)</li>
+      <li>Domains that change often, where hand-built screens can't keep up</li>
+      <li>Small teams that need a working UI quickly, such as prototypes that grow into products</li>
+      <li>Expert users who prefer direct access to objects over guided wizards</li>
+    </ul>
+  </div>
+  <div class="bad">
+    <h4>Weak fit</h4>
+    <ul>
+      <li>Consumer-facing products where every pixel and flow is designed</li>
+      <li>Highly visual interfaces (maps, canvases, dashboards with charts)</li>
+      <li>Linear flows that cut across many objects (checkout, onboarding)</li>
+      <li>Domains with little behaviour, where a plain admin generator is enough</li>
+      <li>Teams whose designers expect full control over every screen</li>
+    </ul>
+  </div>
+</div>
+<p>A common and effective split: <strong>generate the back office, hand-build the customer-facing front</strong>. Both use the same domain objects and the same generic API.</p>
+
+<h2 id="benefits">Benefits</h2>
+<ul>
+  <li><strong>Much less code.</strong> One class instead of entity + DTO + controller + form + table.</li>
+  <li><strong>Consistency.</strong> Every screen behaves the same way, so users learn the app once.</li>
+  <li><strong>Rules in one place.</strong> See <a href="rules.html">Rules once, enforced everywhere</a>.</li>
+  <li><strong>Fast feedback on the model.</strong> Domain experts can click through a new concept the same day it's coded and correct the language.</li>
+  <li><strong>Pressure toward good design.</strong> Anemic objects produce obviously poor UIs, which pushes behaviour onto the objects where it belongs.</li>
+</ul>
+
+<h2 id="costs">Costs</h2>
+<ul>
+  <li><strong>Generic look and feel.</strong> Screens look like the model. Good for experts, sometimes poor for occasional users.</li>
+  <li><strong>The model becomes a UI contract.</strong> Renaming a field changes the screen and the API. That's intended, but it needs review and API versioning if external clients exist.</li>
+  <li><strong>Framework learning curve</strong>, or the cost of maintaining your own introspector and renderer.</li>
+  <li><strong>Edge cases need escape hatches.</strong> Plan for <a href="customisation.html">customisation</a> from the start.</li>
+</ul>
+
+<h2 id="security">Security</h2>
+<p>A generic API that can reach any object is powerful, and dangerous if it's designed carelessly. Build these in from the beginning:</p>
+<table>
+  <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+  <tbody>
+    <tr><td>Exposing classes or methods that were never meant to be public</td><td><strong>Allowlist</strong>: only <code>@DomainObject</code> types and explicitly annotated <code>@Property</code>/<code>@Action</code> members are reachable. Never expose a member just because it's public.</td></tr>
+    <tr><td>Mass assignment: the client sets fields it shouldn't (<code>status</code>, <code>price</code>)</td><td>Edit one property at a time through the spec. Reject non-editable properties. Never bind client JSON directly onto entities.</td></tr>
+    <tr><td>Calling arbitrary methods by name</td><td>Invoke only <code>Method</code> handles captured in the registry at startup. Never call <code>getMethod(nameFromRequest)</code>.</td></tr>
+    <tr><td>Bypassing rules by calling the API directly</td><td>The server re-runs hide/disable/validate on every request (see <a href="rest-api.html#invoke">invoke</a>).</td></tr>
+    <tr><td>Insecure direct object references (reading someone else's object by id)</td><td>Per-object authorisation in the generic loader (tenant, owner, role), not only per type.</td></tr>
+    <tr><td>Leaking sensitive fields</td><td>Per-member view permissions, applied when building the representation.</td></tr>
+    <tr><td>Deserialisation attacks</td><td>Bind values by declared parameter type only; load references from repositories; no polymorphic type info from the client.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="performance">Performance</h2>
+<ul>
+  <li><strong>Reflection cost</strong>: build specs and method handles once at startup; never reflect per request.</li>
+  <li><strong>Supporting methods per row</strong>: computing <code>disableX()</code> for every action on every row of a 500-row table adds up. Compute member state only on the object page, not in list views.</li>
+  <li><strong>N+1 queries</strong>: titles of referenced objects and collection rows can trigger many loads. Batch-fetch references, page collections, and use read-optimised queries for list views.</li>
+  <li><strong>Large collections</strong>: never render an unbounded collection inline. Page it, or show it as a link to a filtered list.</li>
+  <li><strong>Cache type metadata</strong> on the client (it changes only on deploy). Never cache instance representations.</li>
+</ul>
+
+<h2 id="alternatives">Related approaches</h2>
+<table>
+  <thead><tr><th>Approach</th><th>Difference</th></tr></thead>
+  <tbody>
+    <tr><td>Admin generators (Django admin, Rails scaffolds, JHipster)</td><td>Generate CRUD screens from the data model; usually little support for behaviour or actions</td></tr>
+    <tr><td>Low-code platforms</td><td>The model is defined in a visual tool rather than in code; less control and versioning</td></tr>
+    <tr><td>Server-driven UI (common in mobile apps)</td><td>The server sends layout and components as JSON; focused on presentation rather than domain objects</td></tr>
+    <tr><td>Hand-built UI over a rich domain model</td><td>Classic DDD: full control over screens, but much more code, and rules tend to get duplicated</td></tr>
+  </tbody>
+</table>

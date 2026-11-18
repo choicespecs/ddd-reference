@@ -1,0 +1,159 @@
+---
+title: Java annotations
+lede: The annotation path. You annotate POJOs, and the server reads them with reflection at startup to build the metamodel. This chapter builds a small introspector you can read in one sitting, then shows how a full framework does the same thing.
+---
+
+<h2 id="the-annotations">The annotations</h2>
+<p>You need very few. Standard <strong>Jakarta Bean Validation</strong> (<code>@NotNull</code>, <code>@NotBlank</code>, <code>@Size</code>, <code>@Min</code>, <code>@Max</code>, <code>@Pattern</code>, <code>@Future</code>) already covers constraints, so the only custom annotations describe <em>presentation and behaviour</em>:</p>
+
+```java
+@Retention(RUNTIME) @Target(TYPE)
+public @interface DomainObject { String plural() default ""; String title() default ""; }
+
+@Retention(RUNTIME) @Target(FIELD)
+public @interface Property { int order() default 100; String label() default ""; boolean editable() default true; boolean hidden() default false; }
+
+@Retention(RUNTIME) @Target(FIELD)
+public @interface Collection { int order() default 100; String label() default ""; boolean editable() default false; }
+
+@Retention(RUNTIME) @Target(METHOD)
+public @interface Action { int order() default 100; String label() default ""; String confirm() default ""; Semantics semantics() default Semantics.NON_IDEMPOTENT; }
+
+@Retention(RUNTIME) @Target(TYPE)
+public @interface ValueType { String widget(); }      // e.g. Money → "money"
+
+@Retention(RUNTIME) @Target(TYPE)
+public @interface DomainMenu { String label(); }
+```
+
+<h2 id="introspector">A small introspector</h2>
+<p>This is the core of the annotation path: a class goes in and an <code>ObjectSpec</code> (from <a href="metamodel.html">The metamodel</a>) comes out. It's about 70 lines and covers most real needs.</p>
+
+```java
+public class AnnotationSpecBuilder {
+
+    public ObjectSpec build(Class<?> type) {
+        DomainObject d = require(type.getAnnotation(DomainObject.class), type);
+        String label = Labels.humanise(type.getSimpleName());
+
+        List<PropertySpec> props = new ArrayList<>();
+        List<CollectionSpec> colls = new ArrayList<>();
+        for (Field f : allFields(type)) {
+            if (f.isAnnotationPresent(Property.class))   props.add(property(f));
+            if (f.isAnnotationPresent(Collection.class)) colls.add(collection(f));
+        }
+        List<ActionSpec> actions = Arrays.stream(type.getMethods())
+            .filter(m -> m.isAnnotationPresent(Action.class))
+            .map(this::action).toList();
+
+        return new ObjectSpec(type.getSimpleName(), label,
+            d.plural().isEmpty() ? label + "s" : d.plural(), d.title(),
+            sorted(props, PropertySpec::order), sorted(colls, CollectionSpec::order),
+            sorted(actions, ActionSpec::order));
+    }
+
+    private PropertySpec property(Field f) {
+        Property p = f.getAnnotation(Property.class);
+        return describe(f.getName(), p.label(), f.getType(), f.getAnnotations(), p.order(), p.editable());
+    }
+
+    private ActionSpec action(Method m) {
+        Action a = m.getAnnotation(Action.class);
+        List<PropertySpec> params = new ArrayList<>();
+        Parameter[] ps = m.getParameters();                   // compile with -parameters
+        for (int i = 0; i < ps.length; i++)
+            params.add(describe(ps[i].getName(), "", ps[i].getType(), ps[i].getAnnotations(), i, true));
+        return new ActionSpec(m.getName(), or(a.label(), Labels.humanise(m.getName())), a.order(),
+            a.semantics(), a.confirm().isEmpty() ? null : a.confirm(), params);
+    }
+
+    /** Shared by properties and action parameters: type → kind, Bean Validation → constraints. */
+    private PropertySpec describe(String id, String label, Class<?> t, Annotation[] anns, int order, boolean editable) {
+        Map<String, Object> c = new LinkedHashMap<>();
+        boolean required = false;
+        for (Annotation a : anns) {
+            switch (a) {
+                case NotNull n  -> required = true;
+                case NotBlank n -> { required = true; c.put("minLength", 1); }
+                case Size s     -> { c.put("minLength", s.min()); c.put("maxLength", s.max()); }
+                case Min m      -> c.put("min", m.value());
+                case Max m      -> c.put("max", m.value());
+                case Pattern p  -> c.put("pattern", p.regexp());
+                case Future f   -> c.put("future", true);
+                default -> {}
+            }
+        }
+        if (t.isEnum()) c.put("enumValues", Arrays.stream(t.getEnumConstants()).map(Object::toString).toList());
+        return new PropertySpec(id, or(label, Labels.humanise(id)), kindOf(t), valueTypeOf(t),
+                                order, required, editable, c);
+    }
+
+    private ValueKind kindOf(Class<?> t) {
+        if (t == String.class)                                 return ValueKind.STRING;
+        if (t == boolean.class || t == Boolean.class)          return ValueKind.BOOLEAN;
+        if (Number.class.isAssignableFrom(wrap(t)))            return ValueKind.NUMBER;
+        if (t.isEnum())                                        return ValueKind.ENUM;
+        if (t == LocalDate.class)                              return ValueKind.DATE;
+        if (t == LocalDateTime.class || t == Instant.class)    return ValueKind.DATETIME;
+        if (t.isAnnotationPresent(ValueType.class))            return ValueKind.VALUE;
+        if (t.isAnnotationPresent(DomainObject.class))         return ValueKind.REFERENCE;
+        throw new UnsupportedType(t);                          // fail fast at startup
+    }
+    // allFields, sorted, or, wrap, valueTypeOf, collection(...) omitted for brevity
+}
+```
+
+<div class="callout"><span class="label">Note</span>
+<p>The <code>switch</code> with type patterns needs Java 21. On older Java, use an <code>if (a instanceof NotNull)</code> chain.</p>
+</div>
+
+<h2 id="discovery">Discovering the classes</h2>
+<p>"Create a POJO and it appears in the UI" needs automatic discovery. Scan the domain packages for <code>@DomainObject</code> and <code>@DomainMenu</code> at startup:</p>
+
+```java
+// With Spring: reuse its classpath scanner
+var scanner = new ClassPathScanningCandidateComponentProvider(false);
+scanner.addIncludeFilter(new AnnotationTypeFilter(DomainObject.class));
+scanner.addIncludeFilter(new AnnotationTypeFilter(DomainMenu.class));
+List<Class<?>> types = scanner.findCandidateComponents("com.fieldhouse.domain").stream()
+    .map(bd -> ClassUtils.resolveClassName(bd.getBeanClassName(), null)).toList();
+
+var registry = new SpecRegistry(types, new AnnotationSpecBuilder());
+// Without Spring: ClassGraph, Reflections, or an explicit list of classes.
+```
+
+<h2 id="supporting-methods">Finding the supporting methods</h2>
+<p>The <a href="actions.html#supporting-methods">naming convention</a> (<code>hideX</code>, <code>disableX</code>, <code>validateX</code>, <code>choicesNX</code>, <code>defaultNX</code>) is resolved by reflection too. Look them up once per action at startup and keep the <code>Method</code> handles in the spec's server-side companion, so you never search by name per request:</p>
+
+```java
+record ActionHandles(Method invoke, Method hide, Method disable, Method validate) {}
+
+static ActionHandles handles(Class<?> type, Method action) {
+    String cap = capitalise(action.getName());                 // "publish" → "Publish"
+    return new ActionHandles(action,
+        find(type, "hide" + cap),                               // () → boolean
+        find(type, "disable" + cap),                            // () → String
+        find(type, "validate" + cap, action.getParameterTypes())); // (params) → String
+}
+```
+
+<h2 id="causeway">The same thing in Apache Causeway</h2>
+<p>Apache Causeway (formerly Apache Isis) is a production-grade framework for this exact path. It builds the metamodel from annotations and conventions, and it generates a web UI (Wicket viewer), a REST API (Restful Objects), security and persistence integration. A Causeway version of <code>Event</code> looks like this (simplified):</p>
+
+```java
+@DomainObject
+@Named("fieldhouse.Event")
+public class Event {
+    @Property(editing = Editing.ENABLED) @PropertyLayout(fieldSetId = "details", sequence = "1")
+    @Getter @Setter private String name;
+
+    @Action(semantics = SemanticsOf.IDEMPOTENT)
+    @ActionLayout(position = ActionLayout.Position.PANEL)
+    public Event publish() { status = EventStatus.ON_SALE; return this; }
+
+    @MemberSupport public String disablePublish() {
+        return tiers.isEmpty() ? "Add at least one price tier first" : null;
+    }
+}
+```
+<p>Write your own introspector when you want something small that you fully control, sitting on top of your existing frontend. Use a framework like Causeway when you want the whole stack (UI, REST, security, layouts) to be generated.</p>

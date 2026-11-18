@@ -1,23 +1,23 @@
-# DDD Reference
+# Domain-Driven UI
 
-A learning reference for **domain-driven design**. It explains the strategic ideas that shape a system, the tactical patterns that shape the code, and the trade-offs in between. One fictional ticketing business is used as the running example throughout.
+A learning reference for building applications where **domain objects drive the UI**. You write plain domain objects (POJOs) with their data, rules and behaviour, and the forms, tables, buttons, validation and REST API are generated from them. The objects are described either with **Java annotations** or with **JSON metadata**. This approach is known as the *Naked Objects* pattern, and it builds on domain-driven design.
 
 **Read it online: https://choicespecs.github.io/ddd-reference/**
 
-This is a reference to read, not a template or framework to install.
+This is a reference to read, not a framework to install. One fictional ticketing business is used as the running example throughout.
 
 ## Contents
 
 | Section | Chapters |
 |---|---|
-| Start | What DDD is · Why DDD (and when not to) · The running example |
-| Strategic design | Ubiquitous language · Subdomains · Discovering the domain (Event Storming, Domain Storytelling, Example Mapping) · Bounded contexts · Context mapping |
-| Tactical design | Entities & value objects · Aggregates · Domain events · Repositories & factories · Domain & application services |
-| Architecture | Layered / hexagonal / clean · Integrating contexts (outbox, idempotency, sagas) · CQRS & event sourcing |
-| Practice | Testing the model · Anti-patterns · DDD in legacy systems · Design checklist |
+| Start | Domain objects drive the UI · Naked Objects & DDD · The running example |
+| Modelling the objects | Names become the UI · Entities & value objects · Aggregates · Behaviour as actions |
+| Describing the objects | The metamodel · Java annotations · JSON metadata · Annotations vs. JSON |
+| From metadata to UI | Rendering the UI · The generic REST API · Rules once, enforced everywhere |
+| Practice | Customisation · Trade-offs (fit, security, performance) |
 | Reference | Glossary · Further reading |
 
-Code examples use modern Java because it reads clearly, but the ideas apply in any language.
+Server examples are plain Java (records, Jakarta Bean Validation). Client examples are TypeScript and Vue.
 
 ## Editing
 

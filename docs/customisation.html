@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A fully generated UI is the starting point, not a ceiling. These are the escape hatches, ordered from lightest to heaviest. Always reach for the lightest one that works.">
+<title>Customisation — Domain-Driven UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">Domain-Driven UI</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
+</ol>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="customisation.html" aria-current="page" class="on">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Practice</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Practice</span>
+          <h1>Customisation</h1>
+          <p class="lede">A fully generated UI is the starting point, not a ceiling. These are the escape hatches, ordered from lightest to heaviest. Always reach for the lightest one that works.</p>
+        </header>
+        <h2 id="ladder">The customisation ladder</h2>
+<ol>
+  <li><a href="#annotations">Hints on the domain object</a>: order, labels, grouping</li>
+  <li><a href="#layout-files">Layout files</a>: arrangement kept outside the class</li>
+  <li><a href="#custom-widgets">Custom widgets</a> for a value type</li>
+  <li><a href="#view-models">View models</a>: purpose-built objects that are rendered the same way</li>
+  <li><a href="#custom-pages">Hand-built pages</a> for the few screens that need them</li>
+</ol>
+
+<h2 id="annotations">1. Hints on the domain object</h2>
+<p>Ordering, labels, groups and multi-line text fit naturally on the class and cover most needs. This extends the <a href="java-annotations.html#the-annotations"><code>@Property</code></a> annotation with <code>group</code> and <code>multiline</code> attributes, which the introspector copies into <code>PropertySpec</code>:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Property(order = 1, group = "Details")                       private String name;
+@Property(order = 2, group = "Details")                       private Venue venue;
+@Property(order = 1, group = "Schedule", label = "On-sale opens") private LocalDateTime onSaleAt;
+@Property(order = 1, group = "Notes", multiline = 6)           private String internalNotes;</code></pre></div>
+
+<h2 id="layout-files">2. Layout files</h2>
+<p>When presentation detail starts crowding the domain class, move the arrangement into a layout file per type. The class keeps the <em>meaning</em> and the layout file keeps the <em>arrangement</em>. Apache Causeway uses <code>Event.layout.xml</code> files for this. The JSON equivalent is a UI schema:</p>
+
+<div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">// Event.layout.json
+{
+  "columns": [
+    { "span": 8, "groups": [ { "label": "Details",  "members": ["name", "venue"] },
+                             { "label": "Schedule", "members": ["onSaleAt", "status"] } ] },
+    { "span": 4, "groups": [ { "label": "Notes",    "members": ["internalNotes"] } ] }
+  ],
+  "collections": ["tiers"],
+  "actionsPanel": ["publish", "addTier", "cancel"]
+}</code></pre></div>
+<p>Load layouts into the metamodel at startup. If no layout exists, fall back to the defaults derived from the class.</p>
+
+<h2 id="custom-widgets">3. Custom widgets</h2>
+<p>Register a component for a value type or kind in the <a href="rendering.html#widget-registry">widget registry</a>. Every property of that type, on every object, picks it up:</p>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">registerWidget({ valueType: 'SeatMap', component: SeatMapPicker })   // visual seat picker
+registerWidget({ valueType: 'GeoPoint', component: MapPin })</code></pre></div>
+<p>This is usually the best customisation per line of code, because one widget improves many screens.</p>
+
+<h2 id="view-models">4. View models</h2>
+<p>Sometimes the screen users need doesn't match a single domain object: a dashboard, a wizard, or a summary across aggregates. Don't distort the domain model to fit. Create a <strong>view model</strong>, which is also a POJO with properties, collections and actions, rendered by the same machinery:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@DomainObject(viewModel = true, title = "eventName")   // add viewModel() to @DomainObject
+public class OnSaleDashboard {
+    @Property private String eventName;
+    @Property private int seatsHeld;
+    @Property private int seatsSold;
+    @Property private Money revenue;
+    @Collection private List&lt;Hold&gt; holdsExpiringSoon;
+
+    @Action public void releaseAllExpiredHolds() { … }   // delegates to the Hold aggregates
+}</code></pre></div>
+<p>View models aren't persisted. They're rebuilt from domain objects (or a read-optimised query) on each request, and their state can be encoded in the URL. They let the generated UI handle task-oriented screens while the domain model stays clean.</p>
+
+<h2 id="custom-pages">5. Hand-built pages</h2>
+<p>For the handful of screens where user experience is critical, such as a public checkout flow or a seat-selection map, build the page by hand. Keep it on the same API: it can still call <code>GET /api/meta</code> for labels and constraints, and invoke actions through the generic endpoints, so the rules stay in one place.</p>
+<div class="callout tip"><span class="label">A healthy ratio</span>
+<p>In a typical back-office application, the vast majority of screens can stay generated, with a small number of hand-built pages for the critical moments. If you find yourself hand-building most screens, the domain objects may not match how users work, or this approach may not suit the application (see <a href="trade-offs.html">Trade-offs</a>).</p>
+</div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="rules.html"><small>← Previous</small>Rules once, enforced everywhere</a><a class="next" href="trade-offs.html"><small>Next →</small>Trade-offs</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/customisation.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+---
+title: The metamodel
+lede: The metamodel is an explicit, serialisable description of your domain classes. It's the hinge of the whole approach, because annotations and JSON both produce it, and the UI and API both consume it.
+---
+
+<h2 id="what-it-is">What it is</h2>
+<dl class="def">
+  <dt>Metamodel</dt>
+  <dd>Data that describes your model: for each domain type, its properties (with types and constraints), its collections, and its actions (with parameters). It's a model <em>of</em> the model.</dd>
+</dl>
+<p>Without a metamodel, the frontend would need to know about <code>Event</code> specifically. With one, the frontend only needs to know about <em>properties, collections and actions</em> in general, so the same rendering code works for every type you'll ever add.</p>
+
+```mermaid
+flowchart LR
+  subgraph Sources
+    POJO["POJO + annotations"] -- "reflection" --> MM
+    JSON["JSON metadata file"] -- "parse" --> MM
+  end
+  MM["Metamodel<br/>(one ObjectSpec per type)"]
+  MM --> R["Renderer"]
+  MM --> API["REST API"]
+  MM --> VAL["Validator"]
+  MM --> DOCS["Docs / OpenAPI"]
+```
+
+<h2 id="shape">Its shape</h2>
+<p>A minimal metamodel needs only a handful of types. This is enough to drive everything in this guide:</p>
+
+```java
+public record ObjectSpec(
+    String type,                 // "Event"
+    String label, String plural, // "Event", "Events"
+    String titleProperty,        // "name"
+    List<PropertySpec> properties,
+    List<CollectionSpec> collections,
+    List<ActionSpec> actions) {}
+
+public record PropertySpec(
+    String id,                   // "onSaleAt"
+    String label,                // "On-sale opens"
+    ValueKind kind,              // STRING, NUMBER, BOOLEAN, ENUM, DATE, DATETIME, VALUE, REFERENCE
+    String valueType,            // "Money" for VALUE, "Venue" for REFERENCE, enum name for ENUM
+    int order,
+    boolean required, boolean editable,
+    Map<String, Object> constraints) {}   // maxLength, min, max, pattern, enumValues…
+
+public record CollectionSpec(String id, String label, String elementType, int order, boolean editable) {}
+
+public record ActionSpec(
+    String id, String label, int order,
+    Semantics semantics,         // SAFE, IDEMPOTENT, NON_IDEMPOTENT
+    String confirm,              // null = no confirmation
+    List<PropertySpec> parameters) {}
+```
+
+<h2 id="type-vs-instance">Type metadata vs. instance state</h2>
+<p>This is the most important distinction to get right. Some information is the same for <em>every</em> <code>Event</code>, and some depends on <em>this</em> event right now:</p>
+<table>
+  <thead><tr><th></th><th>Type metadata (ObjectSpec)</th><th>Instance representation</th></tr></thead>
+  <tbody>
+    <tr><td>Examples</td><td>"Event has a required <code>name</code>, max 120 chars"; "Event has a <code>publish</code> action"</td><td>"This event's name is Summer Jam"; "<code>publish</code> is disabled because there are no tiers"</td></tr>
+    <tr><td>Changes when</td><td>You deploy new code</td><td>Every request</td></tr>
+    <tr><td>Caching</td><td>Cache aggressively (per deployment)</td><td>Never cache</td></tr>
+    <tr><td>Endpoint</td><td><code>GET /api/meta/Event</code></td><td><code>GET /api/objects/Event/42</code></td></tr>
+  </tbody>
+</table>
+
+```json
+// GET /api/objects/Event/42: the instance representation
+{
+  "type": "Event", "id": "42", "title": "Summer Jam 2026",
+  "values": {
+    "name": "Summer Jam 2026",
+    "venue": { "type": "Venue", "id": "7", "title": "Riverside Arena (Leeds)" },
+    "onSaleAt": "2026-06-01T10:00:00",
+    "status": "DRAFT",
+    "tiers": []
+  },
+  "members": {
+    "publish": { "disabledReason": "Add at least one price tier first" },
+    "cancel":  { "hidden": false },
+    "name":    { "disabledReason": null }
+  }
+}
+```
+<p>The renderer combines the two: the <strong>spec</strong> says what to draw, and the <strong>instance</strong> says what values to put in it and which members are hidden or disabled right now. The dynamic state comes from the <code>hideX</code> / <code>disableX</code> methods described in <a href="actions.html#supporting-methods">Behaviour as actions</a>.</p>
+
+<h2 id="build-once">Build it once, at startup</h2>
+<p>Building the metamodel uses reflection (or JSON parsing), and neither is free. Do it <strong>once per type at startup</strong>, keep the results in a registry, and fail fast on mistakes. Startup is the best time to discover that <code>disablePublish()</code> returns the wrong type.</p>
+
+```java
+public class SpecRegistry {
+    private final Map<String, ObjectSpec> specs = new ConcurrentHashMap<>();
+
+    public SpecRegistry(List<Class<?>> domainTypes, SpecBuilder builder) {
+        for (Class<?> c : domainTypes) {
+            ObjectSpec spec = builder.build(c);   // reflection or JSON; see next chapters
+            specs.put(spec.type(), spec);
+        }
+    }
+    public ObjectSpec get(String type) {
+        var s = specs.get(type);
+        if (s == null) throw new UnknownType(type);   // also an allowlist: unknown = not exposed
+        return s;
+    }
+    public List<ObjectSpec> all() { return List.copyOf(specs.values()); }   // drives the menu
+}
+```
+
+<div class="callout tip"><span class="label">The registry is also your allowlist</span>
+<p>Only types in the registry can be reached through the generic API. Only members in a spec can be read, edited or invoked. That's how you avoid accidentally exposing every class and every method on the classpath. See <a href="trade-offs.html#security">Security</a>.</p>
+</div>

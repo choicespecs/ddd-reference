@@ -1,74 +1,45 @@
 ---
 title: Glossary
-lede: Every DDD term used in this guide, with a short definition and a link to where it's explained.
+lede: Every term used in this guide, with a short definition and a link to where it's explained.
 ---
 
-<h2 id="a-c">A – C</h2>
+<h2 id="a-g">A – G</h2>
 <dl class="def">
-  <dt>Aggregate</dt><dd>A cluster of entities and value objects treated as one unit for data changes, with a single root and a consistency boundary. <a href="aggregates.html">→</a></dd>
-  <dt>Aggregate root</dt><dd>The one entity in an aggregate that outside code may reference and call; it enforces the aggregate's invariants.</dd>
-  <dt>Anemic domain model</dt><dd>An anti-pattern where domain objects hold data but no behaviour, with the logic in services. <a href="anti-patterns.html#anemic">→</a></dd>
-  <dt>Anti-corruption layer (ACL)</dt><dd>A translation layer that protects a context's model from an upstream model. <a href="context-mapping.html#acl">→</a></dd>
-  <dt>Application service</dt><dd>Coordinates a use case: loads aggregates, calls domain methods, saves, publishes events. No business rules. <a href="services.html#application-services">→</a></dd>
-  <dt>Big ball of mud</dt><dd>A system without discernible boundaries, where models are tangled together. <a href="context-mapping.html#big-ball-of-mud">→</a></dd>
-  <dt>Bounded context</dt><dd>An explicit boundary inside which one model and one meaning for each term applies. <a href="bounded-contexts.html">→</a></dd>
-  <dt>Bubble context</dt><dd>A small, clean new context inside a legacy landscape, protected by an ACL. <a href="legacy.html#bubble-context">→</a></dd>
-  <dt>Command</dt><dd>A request to change state, named in the imperative (<code>PlaceHold</code>); it may be rejected.</dd>
-  <dt>Conformist</dt><dd>A downstream context that adopts the upstream model without translation. <a href="context-mapping.html#conformist">→</a></dd>
-  <dt>Context map</dt><dd>A diagram and description of the relationships between bounded contexts and their teams. <a href="context-mapping.html">→</a></dd>
-  <dt>Core domain / subdomain</dt><dd>The part of the business that provides competitive advantage, where modelling effort pays off most. <a href="subdomains.html">→</a></dd>
-  <dt>CQRS</dt><dd>Command Query Responsibility Segregation: separate models for writing and reading. <a href="cqrs-event-sourcing.html#cqrs">→</a></dd>
-  <dt>Customer–supplier</dt><dd>An upstream/downstream relationship where the upstream team plans around the downstream team's needs. <a href="context-mapping.html#customer-supplier">→</a></dd>
-</dl>
-
-<h2 id="d-g">D – G</h2>
-<dl class="def">
-  <dt>Distillation</dt><dd>Separating the core domain from supporting and generic concerns so it stays small and clear. <a href="subdomains.html#distillation">→</a></dd>
-  <dt>Domain</dt><dd>The area of knowledge or activity the software serves, such as live-event ticketing.</dd>
-  <dt>Domain event</dt><dd>An immutable record of a business-significant fact, named in the past tense. <a href="domain-events.html">→</a></dd>
-  <dt>Domain expert</dt><dd>Someone with deep knowledge of the business: organisers, box-office staff, finance, operations.</dd>
-  <dt>Domain model</dt><dd>The system of abstractions (expressed in language and code) that captures the parts of the domain relevant to the problem.</dd>
-  <dt>Domain service</dt><dd>A stateless operation that expresses domain logic not belonging to any single entity or value object. <a href="services.html#domain-services">→</a></dd>
-  <dt>Domain Storytelling</dt><dd>A workshop technique where experts tell concrete stories that are drawn as pictographic sentences. <a href="discovery.html#domain-storytelling">→</a></dd>
-  <dt>Entity</dt><dd>An object defined by a lasting identity rather than its attributes. <a href="entities-value-objects.html#entities">→</a></dd>
-  <dt>Event sourcing</dt><dd>Persisting an aggregate as its sequence of events rather than its current state. <a href="cqrs-event-sourcing.html#event-sourcing">→</a></dd>
-  <dt>Event Storming</dt><dd>A collaborative workshop that models a domain as a timeline of domain events on sticky notes. <a href="discovery.html#event-storming">→</a></dd>
-  <dt>Eventual consistency</dt><dd>Data across boundaries becomes consistent after a short delay rather than instantly. <a href="integrating-contexts.html#eventual-consistency">→</a></dd>
-  <dt>Example Mapping</dt><dd>A technique that breaks a story into rules, concrete examples and open questions. <a href="discovery.html#example-mapping">→</a></dd>
-  <dt>Factory</dt><dd>Something that encapsulates creating a valid aggregate or complex value. <a href="repositories-factories.html#factories">→</a></dd>
-  <dt>Generic subdomain</dt><dd>A solved problem common to many businesses (payments, email, identity); usually bought rather than built.</dd>
+  <dt>Action</dt><dd>A business operation on a domain object, exposed in the UI as a button and in the API as an invokable endpoint. <a href="actions.html">→</a></dd>
+  <dt>Aggregate</dt><dd>A cluster of objects that changes as one unit, with a single root; in the UI, one page with nested children. <a href="aggregates.html">→</a></dd>
+  <dt>Aggregate root</dt><dd>The entity in an aggregate that outside code and the UI interact with; gets its own page and URL.</dd>
+  <dt>Anemic model</dt><dd>Domain objects with data but no behaviour; produces a UI that is just a field editor. <a href="actions.html#why-actions">→</a></dd>
+  <dt>Apache Causeway</dt><dd>A Java framework implementing the Naked Objects pattern (formerly Apache Isis). <a href="java-annotations.html#causeway">→</a></dd>
+  <dt>Bean Validation</dt><dd>The Jakarta standard for constraint annotations (<code>@NotNull</code>, <code>@Size</code>, …); a ready-made source of metadata.</dd>
+  <dt>Domain object</dt><dd>A class that represents a business concept with its data, rules and behaviour, usually a POJO.</dd>
+  <dt>Domain-driven design (DDD)</dt><dd>An approach to software that puts a rich, shared model of the business at its centre (Eric Evans, 2003). <a href="naked-objects.html#relationship-to-ddd">→</a></dd>
+  <dt>Entity</dt><dd>An object with a lasting identity; gets its own page and is referenced by link. <a href="entities-value-objects.html">→</a></dd>
 </dl>
 
 <h2 id="i-p">I – P</h2>
 <dl class="def">
-  <dt>Idempotency</dt><dd>Handling the same message more than once has the same effect as handling it once. <a href="integrating-contexts.html#idempotency">→</a></dd>
-  <dt>Integration event</dt><dd>A versioned, public event meant for other bounded contexts, as opposed to an internal domain event. <a href="domain-events.html#domain-vs-integration">→</a></dd>
-  <dt>Invariant</dt><dd>A business rule that must always hold true for an aggregate when it's saved.</dd>
-  <dt>Modular monolith</dt><dd>One deployable whose code is split into modules with enforced boundaries, often one per bounded context.</dd>
-  <dt>Module</dt><dd>A grouping of model elements by domain concept (e.g. <code>hold/</code>), named in the ubiquitous language.</dd>
-  <dt>Open host service (OHS)</dt><dd>A well-defined protocol that an upstream context offers to all consumers. <a href="context-mapping.html#ohs">→</a></dd>
-  <dt>Outbox (transactional)</dt><dd>Writing events to a table in the same transaction as the state change, then relaying them to a broker. <a href="integrating-contexts.html#outbox">→</a></dd>
-  <dt>Partnership</dt><dd>Two teams that coordinate closely and evolve their interface together. <a href="context-mapping.html#partnership">→</a></dd>
-  <dt>Policy</dt><dd>A reactive business rule: "whenever X happens, do Y". Shown as lilac stickies in Event Storming.</dd>
-  <dt>Port / adapter</dt><dd>An interface owned by the core (port) and a technology-specific implementation (adapter). <a href="architecture.html#hexagonal">→</a></dd>
-  <dt>Process manager</dt><dd>A stateful coordinator for a long-running process across aggregates or contexts. <a href="integrating-contexts.html#sagas">→</a></dd>
-  <dt>Projection / read model</dt><dd>A query-optimised view built from events or state, used on the read side of CQRS.</dd>
-  <dt>Published language (PL)</dt><dd>A documented, shared schema used for integration between contexts. <a href="context-mapping.html#ohs">→</a></dd>
+  <dt>Instance representation</dt><dd>The JSON for one object right now: values plus dynamic member state (hidden, disabled reasons). <a href="metamodel.html#type-vs-instance">→</a></dd>
+  <dt>Introspection</dt><dd>Reading a class's structure at runtime with reflection to build its metamodel. <a href="java-annotations.html#introspector">→</a></dd>
+  <dt>JSON Schema</dt><dd>A standard vocabulary for describing JSON data (types, required fields, constraints). <a href="json-metadata.html">→</a></dd>
+  <dt>Layout file</dt><dd>A per-type file that arranges members into columns and groups, separate from the domain class. <a href="customisation.html#layout-files">→</a></dd>
+  <dt>Member</dt><dd>A property, collection or action of a domain object.</dd>
+  <dt>Metamodel</dt><dd>A serialisable description of domain types and their members, consumed by the renderer and the API. <a href="metamodel.html">→</a></dd>
+  <dt>Naked Objects</dt><dd>The pattern in which domain objects are exposed directly to users through a generated UI (Richard Pawson). <a href="naked-objects.html">→</a></dd>
+  <dt>POJO</dt><dd>Plain Old Java Object: a class with no required framework base class or interface.</dd>
+  <dt>Problem+json</dt><dd>The RFC 9457 format for HTTP API errors; lets a generic UI place errors on the right field. <a href="rest-api.html#errors">→</a></dd>
 </dl>
 
 <h2 id="r-z">R – Z</h2>
 <dl class="def">
-  <dt>Reconstitution</dt><dd>Rebuilding an existing aggregate from storage, without re-running creation rules or raising events.</dd>
-  <dt>Repository</dt><dd>A collection-like abstraction for retrieving and storing aggregates. <a href="repositories-factories.html#repositories">→</a></dd>
-  <dt>Saga</dt><dd>A long-running business transaction made of local steps with compensations; often implemented by a process manager or by choreography.</dd>
-  <dt>Separate ways</dt><dd>Choosing not to integrate two contexts at all. <a href="context-mapping.html#separate-ways">→</a></dd>
-  <dt>Shared kernel</dt><dd>A small part of the model explicitly shared by two contexts and changed only by agreement. <a href="context-mapping.html#shared-kernel">→</a></dd>
-  <dt>Strangler fig</dt><dd>Gradually replacing a legacy system by routing capabilities to new code one at a time. <a href="legacy.html#strangler-fig">→</a></dd>
-  <dt>Strategic design</dt><dd>The part of DDD concerned with subdomains, bounded contexts and their relationships.</dd>
-  <dt>Subdomain</dt><dd>A coherent part of the business problem: core, supporting or generic. <a href="subdomains.html">→</a></dd>
-  <dt>Supporting subdomain</dt><dd>A business-specific area that's necessary but not a differentiator.</dd>
-  <dt>Tactical design</dt><dd>The building-block patterns used to implement a model inside one bounded context.</dd>
-  <dt>Ubiquitous language</dt><dd>The shared, rigorous language of a bounded context, used by experts and developers in conversation and code. <a href="ubiquitous-language.html">→</a></dd>
-  <dt>Upstream / downstream</dt><dd>The direction of influence between two contexts; downstream depends on upstream. <a href="context-mapping.html#upstream-downstream">→</a></dd>
-  <dt>Value object</dt><dd>An immutable object defined only by its attributes, with no identity. <a href="entities-value-objects.html#value-objects">→</a></dd>
+  <dt>Reference</dt><dd>A property that points to another entity; rendered as a link plus a lookup.</dd>
+  <dt>Restful Objects</dt><dd>A specification for exposing domain objects over a generic REST API (Dan Haywood). <a href="rest-api.html">→</a></dd>
+  <dt>See it, use it, do it</dt><dd>The order of checks for any member: visible (hide), usable (disable), valid (validate). <a href="rules.html#the-checks-in-order">→</a></dd>
+  <dt>Spec registry</dt><dd>The startup-built map of type name → <code>ObjectSpec</code>; doubles as the allowlist. <a href="metamodel.html#build-once">→</a></dd>
+  <dt>Supporting method</dt><dd>A convention-named method (<code>hideX</code>, <code>disableX</code>, <code>validateX</code>, <code>choicesNX</code>, <code>defaultNX</code>) that governs a member. <a href="actions.html#supporting-methods">→</a></dd>
+  <dt>Title</dt><dd>The human-readable name of an object, used in headings, links and lookups.</dd>
+  <dt>UI schema</dt><dd>A JSON document describing layout and widgets for a data schema. <a href="json-metadata.html#ui-schema">→</a></dd>
+  <dt>Ubiquitous language</dt><dd>The shared vocabulary of experts and developers; here, also the labels in the UI. <a href="ubiquitous-language.html">→</a></dd>
+  <dt>Value object</dt><dd>An immutable object defined by its attributes; rendered as a widget. <a href="entities-value-objects.html">→</a></dd>
+  <dt>View model</dt><dd>A non-persisted POJO built for a particular screen, rendered by the same machinery. <a href="customisation.html#view-models">→</a></dd>
+  <dt>Widget registry</dt><dd>The client-side map from kind or value type to a UI component. <a href="rendering.html#widget-registry">→</a></dd>
 </dl>

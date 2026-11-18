@@ -1,0 +1,170 @@
+---
+title: Rendering the UI
+lede: A generic renderer turns metadata plus an instance into forms, tables and buttons. You write it once, and it renders every domain object you'll ever add.
+---
+
+<h2 id="pieces">The pieces</h2>
+<table>
+  <thead><tr><th>Piece</th><th>Job</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Widget registry</strong></td><td>Maps a property's kind (and value type) to a widget component</td></tr>
+    <tr><td><strong>ObjectView</strong></td><td>One page for any object: title, property form, collection tables, action bar</td></tr>
+    <tr><td><strong>ListView</strong></td><td>A table of objects of one type, with columns derived from the spec</td></tr>
+    <tr><td><strong>ActionDialog</strong></td><td>Builds a form from an action's parameter specs and invokes it</td></tr>
+    <tr><td><strong>Generic routes</strong></td><td><code>/objects/:type/:id</code> and <code>/list/:type</code>, so new types need no new routes</td></tr>
+    <tr><td><strong>Menu</strong></td><td>Built from <code>GET /api/meta</code>, the list of all registered types and menus</td></tr>
+  </tbody>
+</table>
+
+<h2 id="types">Client-side types</h2>
+<p>These mirror the server's <a href="metamodel.html#shape">metamodel</a>:</p>
+
+```ts
+export type ValueKind = 'STRING' | 'NUMBER' | 'BOOLEAN' | 'ENUM' | 'DATE' | 'DATETIME' | 'VALUE' | 'REFERENCE'
+
+export interface PropertySpec {
+  id: string; label: string; kind: ValueKind; valueType?: string
+  order: number; required: boolean; editable: boolean
+  constraints: { minLength?: number; maxLength?: number; min?: number; max?: number; pattern?: string; enumValues?: string[] }
+}
+export interface ActionSpec {
+  id: string; label: string; order: number; confirm?: string
+  semantics: 'SAFE' | 'IDEMPOTENT' | 'NON_IDEMPOTENT'; parameters: PropertySpec[]
+}
+export interface ObjectSpec {
+  type: string; label: string; plural: string; titleProperty: string
+  properties: PropertySpec[]; collections: { id: string; label: string; elementType: string }[]
+  actions: ActionSpec[]
+}
+export interface ObjectRep {
+  type: string; id: string; title: string
+  values: Record<string, unknown>
+  members: Record<string, { hidden?: boolean; disabledReason?: string | null }>
+}
+```
+
+<h2 id="widget-registry">The widget registry</h2>
+<p>This is the one place where "type → UI" is decided. Value objects register their own widgets, and everything else falls back to a default by kind:</p>
+
+```ts
+import TextInput from './widgets/TextInput.vue'
+import NumberInput from './widgets/NumberInput.vue'
+// … Checkbox, Select, DateInput, DateTimeInput, RefLookup, MoneyInput
+
+const byValueType: Record<string, Component> = {
+  Money: MoneyInput,             // registered once; every Money everywhere uses it
+  EmailAddress: EmailInput,
+}
+const byKind: Record<ValueKind, Component> = {
+  STRING: TextInput, NUMBER: NumberInput, BOOLEAN: Checkbox, ENUM: Select,
+  DATE: DateInput, DATETIME: DateTimeInput, REFERENCE: RefLookup, VALUE: TextInput,
+}
+
+export function widgetFor(p: PropertySpec): Component {
+  return (p.valueType && byValueType[p.valueType]) || byKind[p.kind]
+}
+```
+
+<h2 id="object-view">ObjectView: one component for every object</h2>
+
+```vue
+<script setup lang="ts">
+import { ref, watchEffect } from 'vue'
+import { api } from '../api'
+import { widgetFor } from '../widgets'
+import ActionDialog from './ActionDialog.vue'
+
+const props = defineProps<{ type: string; id: string }>()
+const spec = ref<ObjectSpec>()
+const obj = ref<ObjectRep>()
+const active = ref<ActionSpec | null>(null)
+
+watchEffect(async () => {
+  [spec.value, obj.value] = await Promise.all([api.meta(props.type), api.get(props.type, props.id)])
+})
+const state = (id: string) => obj.value?.members[id] ?? {}
+
+async function save(p: PropertySpec, value: unknown) {
+  obj.value = await api.setProperty(props.type, props.id, p.id, value)   // server validates
+}
+</script>
+
+<template>
+  <article v-if="spec && obj">
+    <header>
+      <small>{{ spec.label }}</small>
+      <h1>{{ obj.title }}</h1>
+      <template v-for="a in spec.actions" :key="a.id">
+        <button v-if="!state(a.id).hidden"
+                :disabled="!!state(a.id).disabledReason"
+                :title="state(a.id).disabledReason ?? ''"
+                @click="active = a">{{ a.label }}</button>
+      </template>
+    </header>
+
+    <template v-for="p in spec.properties" :key="p.id">
+      <label v-if="!state(p.id).hidden">
+        {{ p.label }}<span v-if="p.required">*</span>
+        <component :is="widgetFor(p)" :spec="p" :model-value="obj.values[p.id]"
+                   :readonly="!p.editable || !!state(p.id).disabledReason"
+                   @update:model-value="(v: unknown) => save(p, v)" />
+      </label>
+    </template>
+
+    <CollectionTable v-for="c in spec.collections" :key="c.id"
+                     :spec="c" :rows="obj.values[c.id] as ObjectRep[]" />
+
+    <ActionDialog v-if="active" :type="type" :id="id" :action="active"
+                  @done="(r) => { obj = r ?? obj; active = null }" @close="active = null" />
+  </article>
+</template>
+```
+
+<h2 id="action-dialog">ActionDialog</h2>
+<p>Action parameters are just <code>PropertySpec</code>s, so the dialog reuses the same widgets. If the action has no parameters, the dialog is skipped and the action is invoked straight away (after a <code>confirm</code> prompt, if the spec has one).</p>
+
+```vue
+<script setup lang="ts">
+const props = defineProps<{ type: string; id: string; action: ActionSpec }>()
+const emit = defineEmits<{ done: [ObjectRep | undefined]; close: [] }>()
+const args = reactive<Record<string, unknown>>({})
+const error = ref<string | null>(null)
+
+async function submit() {
+  try { emit('done', await api.invoke(props.type, props.id, props.action.id, args)) }
+  catch (e) { error.value = problemMessage(e) }        // server's validateX() reason lands here
+}
+</script>
+
+<template>
+  <dialog open>
+    <h2>{{ action.label }}</h2>
+    <p v-if="action.confirm">{{ action.confirm }}</p>
+    <label v-for="p in action.parameters" :key="p.id">
+      {{ p.label }}
+      <component :is="widgetFor(p)" :spec="p" v-model="args[p.id]" />
+    </label>
+    <p v-if="error" role="alert">{{ error }}</p>
+    <button @click="submit">{{ action.label }}</button>
+    <button @click="emit('close')">Cancel</button>
+  </dialog>
+</template>
+```
+
+<h2 id="routes">Generic routes</h2>
+
+```ts
+const routes = [
+  { path: '/',                    component: Home },        // menu from GET /api/meta
+  { path: '/list/:type',          component: ListView,   props: true },
+  { path: '/objects/:type/:id',   component: ObjectView, props: true },
+]
+```
+<p>When you add the <code>Promotion</code> class on the server, it appears in the menu, <code>/list/Promotion</code> works, and each promotion opens at <code>/objects/Promotion/:id</code>. No frontend change is needed.</p>
+
+<h2 id="client-validation">Client-side validation from constraints</h2>
+<p>Widgets read <code>spec.constraints</code> to give instant feedback (<code>maxlength</code>, <code>min</code>, <code>pattern</code>, required markers). This is a convenience only. The server re-checks everything (see <a href="rules.html">Rules</a>). If you use the <a href="json-metadata.html">JSON Schema</a> path, a standard validator such as Ajv can check a whole form against the schema in one call.</p>
+
+<div class="callout tip"><span class="label">Off-the-shelf renderers</span>
+<p>If you emit JSON Schema, you don't have to write the form renderer yourself. <strong>JSON Forms</strong> (React, Angular, Vue), <strong>react-jsonschema-form</strong> and <strong>Formily</strong> render schema-driven forms. You'd still build the object page, collection tables and action bar around them.</p>
+</div>

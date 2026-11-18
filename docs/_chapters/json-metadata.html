@@ -1,0 +1,119 @@
+---
+title: JSON metadata
+lede: The JSON path. Objects are described in JSON (a data schema plus UI hints) and a generic frontend renders forms from it. The JSON can be written by hand, stored as configuration, or generated from your POJOs.
+---
+
+<h2 id="two-documents">Two documents: data schema and UI schema</h2>
+<p>Most JSON-driven UI libraries separate <strong>what the data is</strong> from <strong>how to lay it out</strong>:</p>
+<table>
+  <thead><tr><th>Document</th><th>Standard</th><th>Says</th></tr></thead>
+  <tbody>
+    <tr><td>Data schema</td><td><strong>JSON Schema</strong> (current draft 2020-12)</td><td>Fields, types, required, min/max, formats, enums</td></tr>
+    <tr><td>UI schema</td><td>Library-specific (JSON Forms, react-jsonschema-form, …)</td><td>Order, grouping, widgets, labels, read-only, conditional visibility</td></tr>
+    <tr><td>Actions</td><td>Your own convention (JSON Schema doesn't cover behaviour)</td><td>Buttons, their parameters (as a schema), confirmation, semantics</td></tr>
+  </tbody>
+</table>
+
+<h2 id="data-schema">The data schema for Event</h2>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fieldhouse.example/schemas/Event.json",
+  "title": "Event",
+  "type": "object",
+  "required": ["name", "venue", "onSaleAt"],
+  "properties": {
+    "name":     { "type": "string", "title": "Name", "minLength": 1, "maxLength": 120 },
+    "venue":    { "type": "string", "title": "Venue", "format": "ref:Venue" },
+    "onSaleAt": { "type": "string", "title": "On-sale opens", "format": "date-time" },
+    "status":   { "type": "string", "title": "Status", "enum": ["DRAFT", "ON_SALE", "CANCELLED"], "readOnly": true },
+    "tiers":    { "type": "array", "title": "Price tiers", "items": { "$ref": "#/$defs/PriceTier" }, "readOnly": true }
+  },
+  "$defs": {
+    "Money": {
+      "type": "object", "x-widget": "money",
+      "required": ["amount", "currency"],
+      "properties": { "amount": { "type": "string", "pattern": "^\\d+(\\.\\d{1,2})?$" },
+                      "currency": { "type": "string", "pattern": "^[A-Z]{3}$" } }
+    },
+    "PriceTier": {
+      "type": "object",
+      "properties": { "name": { "type": "string" }, "price": { "$ref": "#/$defs/Money" },
+                      "capacity": { "type": "integer", "minimum": 1 } }
+    }
+  }
+}
+```
+<p>Custom formats (<code>ref:Venue</code>) and <code>x-</code> keywords (<code>x-widget</code>) are allowed: JSON Schema ignores keywords it doesn't know. Use them for things the standard doesn't cover, and keep a list of the ones you use.</p>
+
+<h2 id="ui-schema">The UI schema</h2>
+<p>For example, in the <strong>JSON Forms</strong> style (jsonforms.io), the UI schema arranges controls that point into the data schema:</p>
+
+```json
+{
+  "type": "VerticalLayout",
+  "elements": [
+    { "type": "Group", "label": "Details", "elements": [
+      { "type": "Control", "scope": "#/properties/name" },
+      { "type": "Control", "scope": "#/properties/venue" },
+      { "type": "Control", "scope": "#/properties/onSaleAt" },
+      { "type": "Control", "scope": "#/properties/status" }
+    ]},
+    { "type": "Control", "scope": "#/properties/tiers", "options": { "detail": "READONLY" } }
+  ]
+}
+```
+
+<h2 id="actions">Describing actions</h2>
+<p>JSON Schema describes data, not behaviour, so actions need a small convention of your own. Describe each action's parameters <em>as a schema</em>, and the same form renderer can draw the dialog:</p>
+
+```json
+"actions": [
+  { "id": "publish", "label": "Publish", "semantics": "IDEMPOTENT" },
+  { "id": "addTier", "label": "Add price tier", "semantics": "NON_IDEMPOTENT",
+    "parameters": {
+      "type": "object", "required": ["name", "price", "capacity"],
+      "properties": {
+        "name":     { "type": "string", "minLength": 1, "maxLength": 40 },
+        "price":    { "$ref": "#/$defs/Money" },
+        "capacity": { "type": "integer", "minimum": 1, "default": 100 }
+      }
+    }
+  },
+  { "id": "cancel", "label": "Cancel", "confirm": "Cancel this event? Buyers will be refunded.",
+    "parameters": { "type": "object", "required": ["reason"],
+                    "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } } } }
+]
+```
+<p>Per-instance state, such as "publish is disabled because…", <strong>can't</strong> go in a static JSON file. It still comes from the server with each object (see <a href="metamodel.html#type-vs-instance">type vs. instance</a>).</p>
+
+<h2 id="three-sources">Where the JSON comes from</h2>
+<div class="cards">
+  <div class="card"><strong>1. Written by hand</strong><span>JSON files checked into the repo next to the code. Simple, but they drift from the Java classes unless tests compare them.</span></div>
+  <div class="card"><strong>2. Stored as configuration</strong><span>Schemas kept in a database and edited by admins at runtime. Useful for user-defined forms; the server must still validate against them.</span></div>
+  <div class="card"><strong>3. Generated from POJOs</strong><span>The POJO stays the single source of truth and the JSON is a build or runtime artifact. Usually the best option.</span></div>
+</div>
+
+<h2 id="generating">Generating JSON Schema from a POJO</h2>
+<p>The <strong>victools jsonschema-generator</strong> library generates JSON Schema from Java classes, and its Jakarta Validation module turns <code>@NotBlank</code>, <code>@Size</code> and the rest into schema constraints:</p>
+
+```java
+var config = new SchemaGeneratorConfigBuilder(SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON)
+    .with(new JakartaValidationModule(JakartaValidationOption.INCLUDE_PATTERN_EXPRESSIONS))
+    .with(new JacksonModule());                                   // respect @JsonProperty names
+config.forFields().withTitleResolver(f -> {                      // labels from @Property or the name
+    Property p = f.getAnnotationConsideringFieldAndGetter(Property.class);
+    return p != null && !p.label().isEmpty() ? p.label() : Labels.humanise(f.getName());
+});
+config.forFields().withReadOnlyCheck(f -> {
+    Property p = f.getAnnotationConsideringFieldAndGetter(Property.class);
+    return p != null && !p.editable();
+});
+
+JsonNode schema = new SchemaGenerator(config.build()).generateSchema(Event.class);
+```
+<p>Alternatively, if you already have the <a href="java-annotations.html">annotation metamodel</a>, serialise <code>ObjectSpec</code> to JSON directly. That's the <strong>hybrid</strong> covered in the next chapter.</p>
+
+<h2 id="server-validation">The server still validates</h2>
+<p>A JSON schema in the browser gives fast feedback, but users can bypass it. Validate every request on the server, either with Bean Validation on the POJO or with a JSON Schema validator (networknt json-schema-validator, everit) against the same schema. See <a href="rules.html">Rules once, enforced everywhere</a>.</p>

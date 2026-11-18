@@ -1,0 +1,52 @@
+---
+title: Naked Objects & DDD
+lede: The pattern behind "domain objects drive the UI": where it came from, its three principles, and how it relates to domain-driven design.
+---
+
+<h2 id="history">A short history</h2>
+<ul>
+  <li><strong>2001–2002</strong>: Richard Pawson and Robert Matthews describe <em>Naked Objects</em> and publish a book of the same name (Wiley, 2002). Pawson's 2004 PhD thesis at Trinity College Dublin formalises the pattern.</li>
+  <li><strong>The Naked Objects Framework</strong> (Java, later also .NET) implements it. The Irish government's Department of Social Protection is one well-known large system built with it.</li>
+  <li><strong>2010</strong>: the Java framework enters the Apache incubator as <strong>Apache Isis</strong>. Dan Haywood also writes the <strong>Restful Objects</strong> specification, a standard REST API for exposing domain objects.</li>
+  <li><strong>2023</strong>: Apache Isis is renamed <strong>Apache Causeway</strong>. It's still the most complete Java implementation and runs on Spring Boot.</li>
+</ul>
+<p>The same idea shows up under other names: <em>metadata-driven UI</em>, <em>model-driven UI</em>, <em>schema-driven forms</em>, <em>server-driven UI</em>, and the admin generators of Django, Rails and JHipster.</p>
+
+<h2 id="principles">The three principles</h2>
+<ol>
+  <li><strong>All business logic lives on the domain objects.</strong> Rules and behaviour aren't spread across controllers and services. An <code>Event</code> knows how to publish itself and when it may not.</li>
+  <li><strong>The UI is a direct representation of the domain objects.</strong> Users see <code>Event</code>s and <code>Hold</code>s, inspect their properties, and invoke their actions. Nobody hand-writes screens for them.</li>
+  <li><strong>The UI is generated 100% automatically from the domain objects.</strong> In practice most frameworks allow some customisation (see <a href="customisation.html">Customisation</a>), but generation is the default.</li>
+</ol>
+
+<div class="callout tip"><span class="label">What "naked" means</span>
+<p>The objects are shown to the user <em>naked</em>, without a hand-built façade of screens and controllers. If an object is well designed, its generated UI is usable. If the generated UI is confusing, the object is usually confusing too. The UI becomes a mirror of the model's quality.</p>
+</div>
+
+<h2 id="relationship-to-ddd">How it relates to domain-driven design</h2>
+<p>Domain-driven design (Eric Evans, 2003) is the broader discipline. Its main concerns are building a <strong>shared language</strong> with domain experts and designing a <strong>rich domain model</strong> whose objects hold both data and behaviour. Classic DDD doesn't say anything about how the UI is built. Teams usually write screens by hand.</p>
+<p>Naked Objects is a DDD-friendly <em>implementation strategy</em> that pushes the model all the way to the screen:</p>
+<table>
+  <thead><tr><th>DDD idea</th><th>What it becomes with Naked Objects</th></tr></thead>
+  <tbody>
+    <tr><td><a href="ubiquitous-language.html">Ubiquitous language</a></td><td>Class, field and method names <em>are</em> the labels users read</td></tr>
+    <tr><td><a href="entities-value-objects.html">Entities</a></td><td>Objects with their own page, reachable by id</td></tr>
+    <tr><td><a href="entities-value-objects.html">Value objects</a></td><td>Widgets inside a form (money, date range, email)</td></tr>
+    <tr><td><a href="aggregates.html">Aggregates</a></td><td>A root page with nested child tables; links to other aggregates</td></tr>
+    <tr><td>Rich behaviour on the model</td><td><a href="actions.html">Actions</a>: buttons and dialogs</td></tr>
+    <tr><td>Invariants</td><td><a href="rules.html">Rules</a> shown in the UI and enforced on the server</td></tr>
+  </tbody>
+</table>
+<p>The two fit together well. Naked Objects actually <em>forces</em> good DDD practice. An anemic object with getters and setters produces a UI that is just a database editor. An object with well-named behaviour produces a UI that reads like the business.</p>
+
+<h2 id="pipeline">The pipeline every implementation shares</h2>
+
+```mermaid
+flowchart LR
+  A["1. Domain classes<br/>(POJOs)"] --> B["2. Introspect<br/>reflection or JSON"]
+  B --> C["3. Metamodel<br/>types · members · rules"]
+  C --> D["4. Generic renderer<br/>widgets per type"]
+  C --> E["5. Generic REST API<br/>read · edit · invoke"]
+  D <--> E
+```
+<p>Every chapter in this guide fits one of these five steps. The key design artifact is the <strong>metamodel</strong> (step 3): an explicit, serialisable description of your classes. Once you have it, the UI and the API are generic code you write once.</p>

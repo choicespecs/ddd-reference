@@ -1,0 +1,97 @@
+---
+title: Behaviour as actions
+lede: Business methods on a domain object become the buttons on its page. Method parameters become the fields of a dialog. This is what makes a generated UI more than a database editor.
+---
+
+<h2 id="why-actions">Why actions, not setters</h2>
+<p>If a POJO has only getters and setters (an <em>anemic</em> model), the generated UI can only edit fields one at a time. Users can set <code>status = CANCELLED</code> without giving a reason, triggering refunds, or checking any rule. That isn't a business application; it's a table editor.</p>
+<p>When behaviour is modelled as methods with business names, the UI shows the operations the business actually performs, each with its own rules:</p>
+<div class="compare">
+  <div class="bad">
+    <h4>Setters → field editing</h4>
+
+```java
+public void setStatus(EventStatus s) { status = s; }
+public void setCancelReason(String r) { … }
+```
+<p>UI: a "Status" dropdown anyone can change.</p>
+  </div>
+  <div class="good">
+    <h4>Actions → operations</h4>
+
+```java
+@Action
+public void cancel(@NotBlank String reason) {
+    status = CANCELLED;
+    refunds.requestFor(this, reason);
+}
+```
+<p>UI: a "Cancel" button that asks for a reason.</p>
+  </div>
+</div>
+
+<h2 id="anatomy">Anatomy of an action</h2>
+<table>
+  <thead><tr><th>In the method</th><th>In the UI</th></tr></thead>
+  <tbody>
+    <tr><td>Method name / <code>label</code></td><td>Button label</td></tr>
+    <tr><td>No parameters</td><td>Button invokes immediately (or after a <code>confirm</code> prompt)</td></tr>
+    <tr><td>Parameters</td><td>A dialog with one field per parameter, using the same <a href="entities-value-objects.html#type-to-widget">type → widget mapping</a> as properties</td></tr>
+    <tr><td>Parameter annotations (<code>@NotBlank</code>, <code>@Min</code>)</td><td>Validation in the dialog, re-checked on the server</td></tr>
+    <tr><td>Return value</td><td>What to show next: <code>void</code> refreshes the page; an object navigates to that object; a list shows a table</td></tr>
+    <tr><td>Exception</td><td>An error message in the dialog</td></tr>
+  </tbody>
+</table>
+
+<h2 id="supporting-methods">Supporting methods (the naming convention)</h2>
+<p>Naked Objects frameworks use a <strong>naming convention</strong> to attach rules to an action without extra annotations. Apache Causeway uses this style. The renderer asks these methods about the <em>current</em> object before drawing the button:</p>
+<table>
+  <thead><tr><th>Method</th><th>Returns</th><th>Effect in the UI</th></tr></thead>
+  <tbody>
+    <tr><td><code>hideCancel()</code></td><td><code>boolean</code></td><td>Button not shown at all</td></tr>
+    <tr><td><code>disablePublish()</code></td><td><code>String</code> reason or <code>null</code></td><td>Button greyed out, with the reason as a tooltip</td></tr>
+    <tr><td><code>validateAddTier(name, price, capacity)</code></td><td><code>String</code> reason or <code>null</code></td><td>Dialog shows the error and won't submit; checks the parameters together</td></tr>
+    <tr><td><code>validate0AddTier(name)</code></td><td><code>String</code> or <code>null</code></td><td>Error shown next to parameter 0</td></tr>
+    <tr><td><code>default2AddTier()</code></td><td>parameter type</td><td>Pre-filled value for parameter 2</td></tr>
+    <tr><td><code>choices0RemoveTier()</code></td><td><code>List</code></td><td>Parameter 0 becomes a dropdown of these options</td></tr>
+    <tr><td><code>autoComplete0Transfer(String search)</code></td><td><code>List</code></td><td>Parameter 0 becomes a search-as-you-type lookup</td></tr>
+  </tbody>
+</table>
+
+```java
+@Action(label = "Add price tier")
+public PriceTier addTier(String name, Money price, int capacity) { … }
+
+public String validate0AddTier(String name) {                     // per-parameter check
+    return name.length() > 40 ? "Keep tier names under 40 characters" : null;
+}
+public String validateAddTier(String name, Money price, int capacity) {   // cross-parameter check
+    return capacity > venue.capacity() ? "Capacity exceeds the venue's " + venue.capacity() : null;
+}
+public int default2AddTier() { return 100; }                      // pre-fill capacity
+```
+
+<div class="callout tip"><span class="label">Why a convention?</span>
+<p>The rule lives right next to the action it governs, in plain Java, and it's easy to unit test: <code>assertEquals("Add at least one price tier first", event.disablePublish())</code>. The same method drives the greyed-out button <em>and</em> the server-side check (see <a href="rules.html">Rules</a>).</p>
+</div>
+
+<h2 id="action-semantics">Action semantics</h2>
+<p>Describe what kind of effect an action has, so the UI and API can treat it correctly:</p>
+<ul>
+  <li><strong>Safe</strong> (query-only, e.g. <code>findHoldsExpiringSoon()</code>): can be a GET, no confirmation needed, and the result can be cached.</li>
+  <li><strong>Idempotent</strong> (e.g. <code>publish()</code>): repeating it is harmless, so it maps to PUT.</li>
+  <li><strong>Non-idempotent</strong> (e.g. <code>addTier()</code>): every call changes state, so it maps to POST and may need confirmation.</li>
+</ul>
+<p>Causeway expresses this as <code>@Action(semantics = SemanticsOf.IDEMPOTENT)</code>. In a home-grown framework it's one enum field on <code>@Action</code>.</p>
+
+<h2 id="menus">Actions not tied to one object</h2>
+<p>Creating and finding objects (<code>createEvent(...)</code>, <code>findEventsByVenue(...)</code>) don't belong to an existing instance. Put them on a <strong>domain service</strong> or <strong>repository</strong> class annotated as a menu, and the renderer shows them in the app's main menu:</p>
+
+```java
+@DomainMenu(label = "Events")
+public class EventMenu {
+    @Action public Event createEvent(@NotBlank String name, Venue venue, LocalDateTime onSaleAt) { … }
+    @Action(semantics = SAFE) public List<Event> findOnSaleEvents() { … }
+    @Action(semantics = SAFE) public List<Event> findEventsAtVenue(Venue venue) { … }
+}
+```

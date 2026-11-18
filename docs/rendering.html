@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A generic renderer turns metadata plus an instance into forms, tables and buttons. You write it once, and it renders every domain object you&#x27;ll ever add.">
+<title>Rendering the UI — Domain-Driven UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">Domain-Driven UI</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
+</ol>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html" aria-current="page" class="on">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / From metadata to UI</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">From metadata to UI</span>
+          <h1>Rendering the UI</h1>
+          <p class="lede">A generic renderer turns metadata plus an instance into forms, tables and buttons. You write it once, and it renders every domain object you'll ever add.</p>
+        </header>
+        <h2 id="pieces">The pieces</h2>
+<table>
+  <thead><tr><th>Piece</th><th>Job</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Widget registry</strong></td><td>Maps a property's kind (and value type) to a widget component</td></tr>
+    <tr><td><strong>ObjectView</strong></td><td>One page for any object: title, property form, collection tables, action bar</td></tr>
+    <tr><td><strong>ListView</strong></td><td>A table of objects of one type, with columns derived from the spec</td></tr>
+    <tr><td><strong>ActionDialog</strong></td><td>Builds a form from an action's parameter specs and invokes it</td></tr>
+    <tr><td><strong>Generic routes</strong></td><td><code>/objects/:type/:id</code> and <code>/list/:type</code>, so new types need no new routes</td></tr>
+    <tr><td><strong>Menu</strong></td><td>Built from <code>GET /api/meta</code>, the list of all registered types and menus</td></tr>
+  </tbody>
+</table>
+
+<h2 id="types">Client-side types</h2>
+<p>These mirror the server's <a href="metamodel.html#shape">metamodel</a>:</p>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">export type ValueKind = 'STRING' | 'NUMBER' | 'BOOLEAN' | 'ENUM' | 'DATE' | 'DATETIME' | 'VALUE' | 'REFERENCE'
+
+export interface PropertySpec {
+  id: string; label: string; kind: ValueKind; valueType?: string
+  order: number; required: boolean; editable: boolean
+  constraints: { minLength?: number; maxLength?: number; min?: number; max?: number; pattern?: string; enumValues?: string[] }
+}
+export interface ActionSpec {
+  id: string; label: string; order: number; confirm?: string
+  semantics: 'SAFE' | 'IDEMPOTENT' | 'NON_IDEMPOTENT'; parameters: PropertySpec[]
+}
+export interface ObjectSpec {
+  type: string; label: string; plural: string; titleProperty: string
+  properties: PropertySpec[]; collections: { id: string; label: string; elementType: string }[]
+  actions: ActionSpec[]
+}
+export interface ObjectRep {
+  type: string; id: string; title: string
+  values: Record&lt;string, unknown&gt;
+  members: Record&lt;string, { hidden?: boolean; disabledReason?: string | null }&gt;
+}</code></pre></div>
+
+<h2 id="widget-registry">The widget registry</h2>
+<p>This is the one place where "type → UI" is decided. Value objects register their own widgets, and everything else falls back to a default by kind:</p>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">import TextInput from './widgets/TextInput.vue'
+import NumberInput from './widgets/NumberInput.vue'
+// … Checkbox, Select, DateInput, DateTimeInput, RefLookup, MoneyInput
+
+const byValueType: Record&lt;string, Component&gt; = {
+  Money: MoneyInput,             // registered once; every Money everywhere uses it
+  EmailAddress: EmailInput,
+}
+const byKind: Record&lt;ValueKind, Component&gt; = {
+  STRING: TextInput, NUMBER: NumberInput, BOOLEAN: Checkbox, ENUM: Select,
+  DATE: DateInput, DATETIME: DateTimeInput, REFERENCE: RefLookup, VALUE: TextInput,
+}
+
+export function widgetFor(p: PropertySpec): Component {
+  return (p.valueType &amp;&amp; byValueType[p.valueType]) || byKind[p.kind]
+}</code></pre></div>
+
+<h2 id="object-view">ObjectView: one component for every object</h2>
+
+<div class="code"><div class="code-head"><span>Vue SFC</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;script setup lang="ts"&gt;
+import { ref, watchEffect } from 'vue'
+import { api } from '../api'
+import { widgetFor } from '../widgets'
+import ActionDialog from './ActionDialog.vue'
+
+const props = defineProps&lt;{ type: string; id: string }&gt;()
+const spec = ref&lt;ObjectSpec&gt;()
+const obj = ref&lt;ObjectRep&gt;()
+const active = ref&lt;ActionSpec | null&gt;(null)
+
+watchEffect(async () =&gt; {
+  [spec.value, obj.value] = await Promise.all([api.meta(props.type), api.get(props.type, props.id)])
+})
+const state = (id: string) =&gt; obj.value?.members[id] ?? {}
+
+async function save(p: PropertySpec, value: unknown) {
+  obj.value = await api.setProperty(props.type, props.id, p.id, value)   // server validates
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;article v-if="spec &amp;&amp; obj"&gt;
+    &lt;header&gt;
+      &lt;small&gt;{{ spec.label }}&lt;/small&gt;
+      &lt;h1&gt;{{ obj.title }}&lt;/h1&gt;
+      &lt;template v-for="a in spec.actions" :key="a.id"&gt;
+        &lt;button v-if="!state(a.id).hidden"
+                :disabled="!!state(a.id).disabledReason"
+                :title="state(a.id).disabledReason ?? ''"
+                @click="active = a"&gt;{{ a.label }}&lt;/button&gt;
+      &lt;/template&gt;
+    &lt;/header&gt;
+
+    &lt;template v-for="p in spec.properties" :key="p.id"&gt;
+      &lt;label v-if="!state(p.id).hidden"&gt;
+        {{ p.label }}&lt;span v-if="p.required"&gt;*&lt;/span&gt;
+        &lt;component :is="widgetFor(p)" :spec="p" :model-value="obj.values[p.id]"
+                   :readonly="!p.editable || !!state(p.id).disabledReason"
+                   @update:model-value="(v: unknown) =&gt; save(p, v)" /&gt;
+      &lt;/label&gt;
+    &lt;/template&gt;
+
+    &lt;CollectionTable v-for="c in spec.collections" :key="c.id"
+                     :spec="c" :rows="obj.values[c.id] as ObjectRep[]" /&gt;
+
+    &lt;ActionDialog v-if="active" :type="type" :id="id" :action="active"
+                  @done="(r) =&gt; { obj = r ?? obj; active = null }" @close="active = null" /&gt;
+  &lt;/article&gt;
+&lt;/template&gt;</code></pre></div>
+
+<h2 id="action-dialog">ActionDialog</h2>
+<p>Action parameters are just <code>PropertySpec</code>s, so the dialog reuses the same widgets. If the action has no parameters, the dialog is skipped and the action is invoked straight away (after a <code>confirm</code> prompt, if the spec has one).</p>
+
+<div class="code"><div class="code-head"><span>Vue SFC</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;script setup lang="ts"&gt;
+const props = defineProps&lt;{ type: string; id: string; action: ActionSpec }&gt;()
+const emit = defineEmits&lt;{ done: [ObjectRep | undefined]; close: [] }&gt;()
+const args = reactive&lt;Record&lt;string, unknown&gt;&gt;({})
+const error = ref&lt;string | null&gt;(null)
+
+async function submit() {
+  try { emit('done', await api.invoke(props.type, props.id, props.action.id, args)) }
+  catch (e) { error.value = problemMessage(e) }        // server's validateX() reason lands here
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;dialog open&gt;
+    &lt;h2&gt;{{ action.label }}&lt;/h2&gt;
+    &lt;p v-if="action.confirm"&gt;{{ action.confirm }}&lt;/p&gt;
+    &lt;label v-for="p in action.parameters" :key="p.id"&gt;
+      {{ p.label }}
+      &lt;component :is="widgetFor(p)" :spec="p" v-model="args[p.id]" /&gt;
+    &lt;/label&gt;
+    &lt;p v-if="error" role="alert"&gt;{{ error }}&lt;/p&gt;
+    &lt;button @click="submit"&gt;{{ action.label }}&lt;/button&gt;
+    &lt;button @click="emit('close')"&gt;Cancel&lt;/button&gt;
+  &lt;/dialog&gt;
+&lt;/template&gt;</code></pre></div>
+
+<h2 id="routes">Generic routes</h2>
+
+<div class="code"><div class="code-head"><span>TypeScript</span><button class="copy" type="button">Copy</button></div><pre><code class="language-typescript">const routes = [
+  { path: '/',                    component: Home },        // menu from GET /api/meta
+  { path: '/list/:type',          component: ListView,   props: true },
+  { path: '/objects/:type/:id',   component: ObjectView, props: true },
+]</code></pre></div>
+<p>When you add the <code>Promotion</code> class on the server, it appears in the menu, <code>/list/Promotion</code> works, and each promotion opens at <code>/objects/Promotion/:id</code>. No frontend change is needed.</p>
+
+<h2 id="client-validation">Client-side validation from constraints</h2>
+<p>Widgets read <code>spec.constraints</code> to give instant feedback (<code>maxlength</code>, <code>min</code>, <code>pattern</code>, required markers). This is a convenience only. The server re-checks everything (see <a href="rules.html">Rules</a>). If you use the <a href="json-metadata.html">JSON Schema</a> path, a standard validator such as Ajv can check a whole form against the schema in one call.</p>
+
+<div class="callout tip"><span class="label">Off-the-shelf renderers</span>
+<p>If you emit JSON Schema, you don't have to write the form renderer yourself. <strong>JSON Forms</strong> (React, Angular, Vue), <strong>react-jsonschema-form</strong> and <strong>Formily</strong> render schema-driven forms. You'd still build the object page, collection tables and action bar around them.</p>
+</div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="annotations-vs-json.html"><small>← Previous</small>Annotations vs. JSON</a><a class="next" href="rest-api.html"><small>Next →</small>The generic REST API</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/rendering.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

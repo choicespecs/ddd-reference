@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The metamodel is an explicit, serialisable description of your domain classes. It&#x27;s the hinge of the whole approach, because annotations and JSON both produce it, and the UI and API both consume it.">
+<title>The metamodel — Domain-Driven UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">Domain-Driven UI</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
+</ol>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html" aria-current="page" class="on">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Describing the objects</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Describing the objects</span>
+          <h1>The metamodel</h1>
+          <p class="lede">The metamodel is an explicit, serialisable description of your domain classes. It's the hinge of the whole approach, because annotations and JSON both produce it, and the UI and API both consume it.</p>
+        </header>
+        <h2 id="what-it-is">What it is</h2>
+<dl class="def">
+  <dt>Metamodel</dt>
+  <dd>Data that describes your model: for each domain type, its properties (with types and constraints), its collections, and its actions (with parameters). It's a model <em>of</em> the model.</dd>
+</dl>
+<p>Without a metamodel, the frontend would need to know about <code>Event</code> specifically. With one, the frontend only needs to know about <em>properties, collections and actions</em> in general, so the same rendering code works for every type you'll ever add.</p>
+
+<pre class="mermaid">
+flowchart LR
+  subgraph Sources
+    POJO["POJO + annotations"] -- "reflection" --&gt; MM
+    JSON["JSON metadata file"] -- "parse" --&gt; MM
+  end
+  MM["Metamodel&lt;br/&gt;(one ObjectSpec per type)"]
+  MM --&gt; R["Renderer"]
+  MM --&gt; API["REST API"]
+  MM --&gt; VAL["Validator"]
+  MM --&gt; DOCS["Docs / OpenAPI"]
+</pre>
+
+<h2 id="shape">Its shape</h2>
+<p>A minimal metamodel needs only a handful of types. This is enough to drive everything in this guide:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public record ObjectSpec(
+    String type,                 // "Event"
+    String label, String plural, // "Event", "Events"
+    String titleProperty,        // "name"
+    List&lt;PropertySpec&gt; properties,
+    List&lt;CollectionSpec&gt; collections,
+    List&lt;ActionSpec&gt; actions) {}
+
+public record PropertySpec(
+    String id,                   // "onSaleAt"
+    String label,                // "On-sale opens"
+    ValueKind kind,              // STRING, NUMBER, BOOLEAN, ENUM, DATE, DATETIME, VALUE, REFERENCE
+    String valueType,            // "Money" for VALUE, "Venue" for REFERENCE, enum name for ENUM
+    int order,
+    boolean required, boolean editable,
+    Map&lt;String, Object&gt; constraints) {}   // maxLength, min, max, pattern, enumValues…
+
+public record CollectionSpec(String id, String label, String elementType, int order, boolean editable) {}
+
+public record ActionSpec(
+    String id, String label, int order,
+    Semantics semantics,         // SAFE, IDEMPOTENT, NON_IDEMPOTENT
+    String confirm,              // null = no confirmation
+    List&lt;PropertySpec&gt; parameters) {}</code></pre></div>
+
+<h2 id="type-vs-instance">Type metadata vs. instance state</h2>
+<p>This is the most important distinction to get right. Some information is the same for <em>every</em> <code>Event</code>, and some depends on <em>this</em> event right now:</p>
+<table>
+  <thead><tr><th></th><th>Type metadata (ObjectSpec)</th><th>Instance representation</th></tr></thead>
+  <tbody>
+    <tr><td>Examples</td><td>"Event has a required <code>name</code>, max 120 chars"; "Event has a <code>publish</code> action"</td><td>"This event's name is Summer Jam"; "<code>publish</code> is disabled because there are no tiers"</td></tr>
+    <tr><td>Changes when</td><td>You deploy new code</td><td>Every request</td></tr>
+    <tr><td>Caching</td><td>Cache aggressively (per deployment)</td><td>Never cache</td></tr>
+    <tr><td>Endpoint</td><td><code>GET /api/meta/Event</code></td><td><code>GET /api/objects/Event/42</code></td></tr>
+  </tbody>
+</table>
+
+<div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">// GET /api/objects/Event/42: the instance representation
+{
+  "type": "Event", "id": "42", "title": "Summer Jam 2026",
+  "values": {
+    "name": "Summer Jam 2026",
+    "venue": { "type": "Venue", "id": "7", "title": "Riverside Arena (Leeds)" },
+    "onSaleAt": "2026-06-01T10:00:00",
+    "status": "DRAFT",
+    "tiers": []
+  },
+  "members": {
+    "publish": { "disabledReason": "Add at least one price tier first" },
+    "cancel":  { "hidden": false },
+    "name":    { "disabledReason": null }
+  }
+}</code></pre></div>
+<p>The renderer combines the two: the <strong>spec</strong> says what to draw, and the <strong>instance</strong> says what values to put in it and which members are hidden or disabled right now. The dynamic state comes from the <code>hideX</code> / <code>disableX</code> methods described in <a href="actions.html#supporting-methods">Behaviour as actions</a>.</p>
+
+<h2 id="build-once">Build it once, at startup</h2>
+<p>Building the metamodel uses reflection (or JSON parsing), and neither is free. Do it <strong>once per type at startup</strong>, keep the results in a registry, and fail fast on mistakes. Startup is the best time to discover that <code>disablePublish()</code> returns the wrong type.</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public class SpecRegistry {
+    private final Map&lt;String, ObjectSpec&gt; specs = new ConcurrentHashMap&lt;&gt;();
+
+    public SpecRegistry(List&lt;Class&lt;?&gt;&gt; domainTypes, SpecBuilder builder) {
+        for (Class&lt;?&gt; c : domainTypes) {
+            ObjectSpec spec = builder.build(c);   // reflection or JSON; see next chapters
+            specs.put(spec.type(), spec);
+        }
+    }
+    public ObjectSpec get(String type) {
+        var s = specs.get(type);
+        if (s == null) throw new UnknownType(type);   // also an allowlist: unknown = not exposed
+        return s;
+    }
+    public List&lt;ObjectSpec&gt; all() { return List.copyOf(specs.values()); }   // drives the menu
+}</code></pre></div>
+
+<div class="callout tip"><span class="label">The registry is also your allowlist</span>
+<p>Only types in the registry can be reached through the generic API. Only members in a spec can be read, edited or invoked. That's how you avoid accidentally exposing every class and every method on the classpath. See <a href="trade-offs.html#security">Security</a>.</p>
+</div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="actions.html"><small>← Previous</small>Behaviour as actions</a><a class="next" href="java-annotations.html"><small>Next →</small>Java annotations</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/metamodel.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="The books, articles and community resources worth your time, roughly in the order you might read them.">
-<title>Further reading — DDD Reference</title>
+<meta name="description" content="Sources on the Naked Objects pattern, the frameworks and standards it uses, and the domain-driven design ideas underneath it.">
+<title>Further reading — Domain-Driven UI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -17,41 +17,37 @@
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
   <nav class="rail" id="rail" aria-label="Chapters">
-    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="brand" href="index.html">Domain-Driven UI</a>
     <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
     <div class="search">
       <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
       <ol id="search-results" hidden></ol>
     </div>
     <div class="nav-group">Start</div><ol>
-<li><a href="index.html">Domain-Driven Design, explained</a></li>
-<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
 <li><a href="running-example.html">The running example</a></li>
 </ol>
-<div class="nav-group">Strategic design</div><ol>
-<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
-<li><a href="subdomains.html">Subdomains</a></li>
-<li><a href="discovery.html">Discovering the domain</a></li>
-<li><a href="bounded-contexts.html">Bounded contexts</a></li>
-<li><a href="context-mapping.html">Context mapping</a></li>
-</ol>
-<div class="nav-group">Tactical design</div><ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
 <li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
 <li><a href="aggregates.html">Aggregates</a></li>
-<li><a href="domain-events.html">Domain events</a></li>
-<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
-<li><a href="services.html">Domain &amp; application services</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
 </ol>
-<div class="nav-group">Architecture</div><ol>
-<li><a href="architecture.html">Architecture for a domain model</a></li>
-<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
-<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
 </ol>
 <div class="nav-group">Practice</div><ol>
-<li><a href="testing.html">Testing the model</a></li>
-<li><a href="anti-patterns.html">Anti-patterns</a></li>
-<li><a href="legacy.html">DDD in legacy systems</a></li>
-<li><a href="checklist.html">Design checklist</a></li>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
 </ol>
 <div class="nav-group">Reference</div><ol>
 <li><a href="glossary.html">Glossary</a></li>
@@ -69,47 +65,47 @@
         <header class="chapter-head">
           <span class="eyebrow">Reference</span>
           <h1>Further reading</h1>
-          <p class="lede">The books, articles and community resources worth your time, roughly in the order you might read them.</p>
+          <p class="lede">Sources on the Naked Objects pattern, the frameworks and standards it uses, and the domain-driven design ideas underneath it.</p>
         </header>
-        <h2 id="books">Books</h2>
+        <h2 id="naked-objects">Naked Objects and model-driven UI</h2>
 <table>
-  <thead><tr><th>Book</th><th>Why read it</th></tr></thead>
+  <thead><tr><th>Source</th><th>Why read it</th></tr></thead>
   <tbody>
-    <tr><td><strong>Learning Domain-Driven Design</strong>, Vlad Khononov (O'Reilly, 2021)</td><td>The most approachable modern introduction. It covers strategic and tactical design and connects DDD to microservices, event-driven architecture and data mesh. A good first book.</td></tr>
-    <tr><td><strong>Domain-Driven Design Distilled</strong>, Vaughn Vernon (Addison-Wesley, 2016)</td><td>Short and practical. Read it in an afternoon to get the whole picture.</td></tr>
-    <tr><td><strong>Domain-Driven Design: Tackling Complexity in the Heart of Software</strong>, Eric Evans (Addison-Wesley, 2003)</td><td>The original "blue book". Dense, but the source of every idea here. Parts III and IV (supple design, strategic design) are often underrated.</td></tr>
-    <tr><td><strong>Implementing Domain-Driven Design</strong>, Vaughn Vernon (Addison-Wesley, 2013)</td><td>The "red book". Detailed implementation guidance, including the aggregate design rules used in this guide.</td></tr>
-    <tr><td><strong>Domain Modeling Made Functional</strong>, Scott Wlaschin (Pragmatic Bookshelf, 2018)</td><td>DDD with types in F#. Excellent on making illegal states unrepresentable, and useful in any language.</td></tr>
-    <tr><td><strong>Architecture Patterns with Python</strong>, Harry Percival & Bob Gregory (O'Reilly, 2020)</td><td>Repository, unit of work, events and CQRS built step by step with tests. Free online at cosmicpython.com.</td></tr>
-    <tr><td><strong>Introducing EventStorming</strong>, Alberto Brandolini (Leanpub)</td><td>From the creator of Event Storming.</td></tr>
-    <tr><td><strong>Domain Storytelling</strong>, Stefan Hofer & Henning Schwentner (Addison-Wesley, 2021)</td><td>A complete guide to the technique.</td></tr>
-    <tr><td><strong>Team Topologies</strong>, Matthew Skelton & Manuel Pais (IT Revolution, 2019)</td><td>Team design that complements context mapping and Conway's law.</td></tr>
+    <tr><td><strong>Naked Objects</strong>, Richard Pawson & Robert Matthews (Wiley, 2002)</td><td>The original book on the pattern: the motivation, principles and case studies.</td></tr>
+    <tr><td><strong>Naked Objects</strong>, Richard Pawson, PhD thesis (Trinity College Dublin, 2004)</td><td>The formal treatment, including the empirical case for the approach.</td></tr>
+    <tr><td><strong>Apache Causeway documentation</strong> (causeway.apache.org)</td><td>The most complete working implementation: annotations, supporting methods, layouts, view models, security.</td></tr>
+    <tr><td><strong>Restful Objects specification</strong>, Dan Haywood</td><td>A standard REST API for domain objects; worth reading even if you build your own.</td></tr>
+    <tr><td><strong>Domain-Driven Design Using Naked Objects</strong>, Dan Haywood (Pragmatic Bookshelf, 2009)</td><td>Combines the two ideas in one book, with a worked example.</td></tr>
   </tbody>
 </table>
 
-<h2 id="articles">Articles & essays</h2>
+<h2 id="standards">Standards and libraries</h2>
 <ul>
-  <li><strong>Effective Aggregate Design</strong> (parts I–III), Vaughn Vernon: the origin of the aggregate rules.</li>
-  <li><strong>Getting Started with DDD When Surrounded by Legacy Systems</strong>, Eric Evans: bubble and autonomous bubble contexts.</li>
-  <li><strong>Anemic Domain Model</strong>, <strong>Bounded Context</strong>, <strong>CQRS</strong>, <strong>Strangler Fig Application</strong>: short essays on martinfowler.com.</li>
-  <li><strong>Hexagonal Architecture</strong>, Alistair Cockburn: the original ports & adapters article.</li>
-  <li><strong>Domain-Driven Design Reference</strong>, Eric Evans: a free summary of all the patterns, written by Evans in 2015.</li>
+  <li><strong>JSON Schema</strong> (json-schema.org): the specification and the "Understanding JSON Schema" guide.</li>
+  <li><strong>JSON Forms</strong> (jsonforms.io): data schema + UI schema renderers for React, Angular and Vue.</li>
+  <li><strong>react-jsonschema-form</strong> (rjsf-team on GitHub): schema-driven forms for React.</li>
+  <li><strong>victools jsonschema-generator</strong>: JSON Schema from Java classes, with Jakarta Validation and Jackson modules.</li>
+  <li><strong>Jakarta Bean Validation</strong> (Hibernate Validator is the reference implementation): constraint annotations.</li>
+  <li><strong>RFC 9457</strong>: Problem Details for HTTP APIs.</li>
+  <li><strong>Ajv</strong>: fast JSON Schema validation in JavaScript, for client-side checks.</li>
 </ul>
 
-<h2 id="community">Community resources</h2>
+<h2 id="ddd">Domain-driven design background</h2>
 <ul>
-  <li><strong>DDD Crew</strong> (<a href="https://github.com/ddd-crew">github.com/ddd-crew</a>): free, open templates and guides, including the Bounded Context Canvas, Aggregate Design Canvas, Context Mapping cheat sheet, Core Domain Charts and the DDD Starter Modelling Process.</li>
-  <li><strong>Virtual DDD</strong>, <strong>DDD Europe</strong> and <strong>Explore DDD</strong>: meetups and conference talks, many recorded and free online.</li>
-  <li><strong>Context Mapper</strong> (contextmapper.org): a DSL and tooling for context maps.</li>
+  <li><strong>Domain-Driven Design</strong>, Eric Evans (Addison-Wesley, 2003): the source of ubiquitous language, entities, value objects and aggregates.</li>
+  <li><strong>Domain-Driven Design Distilled</strong>, Vaughn Vernon (2016): a short overview.</li>
+  <li><strong>Learning Domain-Driven Design</strong>, Vlad Khononov (O'Reilly, 2021): a modern, approachable introduction.</li>
+  <li><strong>Domain Modeling Made Functional</strong>, Scott Wlaschin (2018): excellent on value objects and making invalid states impossible.</li>
+  <li><strong>"Anemic Domain Model"</strong>, Martin Fowler (martinfowler.com): why objects need behaviour.</li>
 </ul>
 
-<h2 id="practice">How to practise</h2>
+<h2 id="try-it">Try it yourself</h2>
 <ol>
-  <li>Pick a domain you know well from outside work: a sports league, a library, your favourite shop.</li>
-  <li>Run a solo Event Storming on paper. Find the hotspots.</li>
-  <li>Draw the subdomains and a context map. Decide which context is core.</li>
-  <li>Model that one context's aggregates with the <a href="https://github.com/ddd-crew/aggregate-design-canvas">Aggregate Design Canvas</a>.</li>
-  <li>Implement it with tests that read like rules. Then change a requirement and see how the model copes.</li>
+  <li>Pick a small domain you know: a book club, a sports league, a home inventory.</li>
+  <li>Write three POJOs with annotations from <a href="java-annotations.html">Java annotations</a>, including at least one action with a <code>disableX()</code> rule.</li>
+  <li>Build the introspector and serve <code>GET /api/meta/{type}</code>. Look at the JSON.</li>
+  <li>Render one generic <code>ObjectView</code> (see <a href="rendering.html">Rendering</a>).</li>
+  <li>Add a fourth class and watch it appear in the UI with no frontend changes. That's the moment the idea clicks.</li>
 </ol>
         <nav class="pager" aria-label="Previous and next"><a class="prev" href="glossary.html"><small>← Previous</small>Glossary</a><span></span></nav>
         <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/further-reading.html">Edit this page on GitHub</a>.</footer>

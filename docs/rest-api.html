@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Instead of one controller per class, a handful of generic endpoints serve every domain object. They read metadata, fetch instances, edit properties and invoke actions, using the metamodel as the allowlist.">
+<title>The generic REST API — Domain-Driven UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">Domain-Driven UI</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
+</ol>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html" aria-current="page" class="on">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / From metadata to UI</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">From metadata to UI</span>
+          <h1>The generic REST API</h1>
+          <p class="lede">Instead of one controller per class, a handful of generic endpoints serve every domain object. They read metadata, fetch instances, edit properties and invoke actions, using the metamodel as the allowlist.</p>
+        </header>
+        <h2 id="endpoints">The endpoints</h2>
+<table>
+  <thead><tr><th>Method & path</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>GET /api/meta</code></td><td>All registered types and menus (builds the app menu)</td></tr>
+    <tr><td><code>GET /api/meta/{type}</code></td><td>The <code>ObjectSpec</code> for one type (cacheable)</td></tr>
+    <tr><td><code>GET /api/objects/{type}?page=&amp;q=</code></td><td>List or search instances</td></tr>
+    <tr><td><code>GET /api/objects/{type}/{id}</code></td><td>One instance: values plus member state</td></tr>
+    <tr><td><code>PUT /api/objects/{type}/{id}/properties/{prop}</code></td><td>Edit one editable property</td></tr>
+    <tr><td><code>GET /api/objects/{type}/{id}/actions/{action}/invoke</code></td><td>Invoke a <em>safe</em> action</td></tr>
+    <tr><td><code>POST /api/objects/{type}/{id}/actions/{action}/invoke</code></td><td>Invoke a state-changing action</td></tr>
+    <tr><td><code>GET /api/objects/{type}/{id}/actions/{action}/choices/{param}?q=</code></td><td>Dropdown/autocomplete options for a parameter</td></tr>
+    <tr><td><code>POST /api/menus/{menu}/actions/{action}/invoke</code></td><td>Menu actions such as <code>createEvent</code></td></tr>
+  </tbody>
+</table>
+<p>This layout follows the <strong>Restful Objects</strong> specification (Dan Haywood), a standard for exposing domain objects over REST. Apache Causeway implements it, so you can read that spec for a complete, battle-tested version including links (HATEOAS) and media types.</p>
+
+<h2 id="invoke">Invoking an action safely</h2>
+<p>This is the most important endpoint, and it must never trust the client. The server re-runs every check that the UI showed:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@PostMapping("/api/objects/{type}/{id}/actions/{action}/invoke")
+public ObjectRep invoke(@PathVariable String type, @PathVariable String id,
+                        @PathVariable String action, @RequestBody Map&lt;String, JsonNode&gt; body) {
+    ObjectSpec spec = registry.get(type);                  // 404 unless registered
+    ActionSpec a = spec.action(action);                    // 404 unless an @Action on this type
+    ActionHandles h = handles.of(type, action);
+    authz.checkCanInvoke(currentUser(), type, action);     // 403
+
+    Object target = repositories.load(type, id);           // 404 if missing
+
+    if (h.isHidden(target))                 throw new NotFound(action);           // hidden = doesn't exist
+    String disabled = h.disabledReason(target);
+    if (disabled != null)                   throw new ActionDisabled(disabled);    // 409/422
+    Object[] args = binder.bind(a.parameters(), body);      // JSON → Money, Venue, LocalDateTime…
+    validator.validateParameters(target, h.invoke(), args); // Bean Validation on parameters → 422
+    String invalid = h.validate(target, args);
+    if (invalid != null)                    throw new ActionInvalid(invalid);      // 422
+
+    Object result = transactions.execute(() -&gt; {
+        Object r = h.invoke().invoke(target, args);         // the domain method runs here
+        validator.validateObject(target);                   // invariants still hold?
+        repositories.save(target);
+        return r;
+    });
+    return representations.of(result == null ? target : result);   // what the UI shows next
+}</code></pre></div>
+
+<h2 id="errors">Errors the UI can show</h2>
+<p>Return errors as <strong>problem+json</strong> (RFC 9457) with field-level detail, so the generic dialog can attach each message to the right field without knowing anything about the type:</p>
+
+<div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">{
+  "type": "https://fieldhouse.example/problems/validation",
+  "title": "Invalid parameters",
+  "status": 422,
+  "detail": "Capacity exceeds the venue's 8000",
+  "errors": [ { "member": "capacity", "message": "must be greater than or equal to 1" } ]
+}</code></pre></div>
+
+<h2 id="binding">Binding values</h2>
+<p>The binder turns JSON into the parameter types declared in the spec. It's driven by the same <code>ValueKind</code> as the widgets:</p>
+<ul>
+  <li><strong>Primitives, enums, dates</strong>: Jackson conversion.</li>
+  <li><strong>Value objects</strong>: a registered parser per type (<code>Money.parse</code>) or Jackson deserialisation of the record. Constructor validation runs, so an invalid value can't be created.</li>
+  <li><strong>References</strong>: the client sends <code>{"type": "Venue", "id": "7"}</code>, and the binder <em>loads</em> the entity from its repository. Never deserialise an entity from client JSON.</li>
+</ul>
+
+<h2 id="representations">Representations</h2>
+<p>An <code>ObjectRep</code> is built from the spec, not by serialising the POJO directly with Jackson. That guarantees only spec'd members leave the server, references become <code>{type, id, title}</code> links, and each member's dynamic state (<code>hidden</code>, <code>disabledReason</code>) is computed for the current user and object.</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public ObjectRep of(Object target) {
+    ObjectSpec spec = registry.get(typeName(target));
+    var values = new LinkedHashMap&lt;String, Object&gt;();
+    var members = new LinkedHashMap&lt;String, MemberState&gt;();
+    for (PropertySpec p : spec.properties()) {
+        if (handles.isHidden(target, p.id()) || !authz.canView(currentUser(), spec, p)) continue;
+        values.put(p.id(), toJsonValue(read(target, p)));         // references → {type,id,title}
+        members.put(p.id(), new MemberState(false, handles.disabledReason(target, p.id())));
+    }
+    for (ActionSpec a : spec.actions())
+        members.put(a.id(), new MemberState(handles.isHidden(target, a.id()),
+                                            handles.disabledReason(target, a.id())));
+    return new ObjectRep(spec.type(), idOf(target), titleOf(target, spec), values, members);
+}</code></pre></div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="rendering.html"><small>← Previous</small>Rendering the UI</a><a class="next" href="rules.html"><small>Next →</small>Rules once, enforced everywhere</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/rest-api.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

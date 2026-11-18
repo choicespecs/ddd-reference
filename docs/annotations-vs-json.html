@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Both paths produce a metamodel. They differ in where the truth lives, who can change it, and how much behaviour they can express. Most teams end up with a hybrid that uses Java as the source and JSON on the wire.">
+<title>Annotations vs. JSON — Domain-Driven UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">Domain-Driven UI</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
+</ol>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html" aria-current="page" class="on">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Describing the objects</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Describing the objects</span>
+          <h1>Annotations vs. JSON</h1>
+          <p class="lede">Both paths produce a metamodel. They differ in where the truth lives, who can change it, and how much behaviour they can express. Most teams end up with a hybrid that uses Java as the source and JSON on the wire.</p>
+        </header>
+        <h2 id="side-by-side">The same property, both ways</h2>
+<div class="compare">
+  <div>
+    <h4>Java annotations</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Property(order = 3, label = "On-sale opens")
+@NotNull @Future
+private LocalDateTime onSaleAt;</code></pre></div>
+  </div>
+  <div>
+    <h4>JSON metadata</h4>
+
+<div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">"onSaleAt": {
+  "type": "string",
+  "format": "date-time",
+  "title": "On-sale opens",
+  "x-order": 3,
+  "x-future": true
+}</code></pre></div>
+  </div>
+</div>
+
+<h2 id="comparison">Comparison</h2>
+<table>
+  <thead><tr><th></th><th>Java annotations</th><th>JSON metadata</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Source of truth</strong></td><td>The POJO itself</td><td>A separate document (unless generated)</td></tr>
+    <tr><td><strong>Behaviour (actions, rules)</strong></td><td>Natural: methods and <code>disableX()</code> are code</td><td>Limited: actions are described, but logic must live on the server</td></tr>
+    <tr><td><strong>Drift risk</strong></td><td>None; the metadata is the class</td><td>High if hand-written; none if generated</td></tr>
+    <tr><td><strong>Type safety & refactoring</strong></td><td>Compiler and IDE renames cover everything</td><td>Strings; renames need searching</td></tr>
+    <tr><td><strong>Change without deploying</strong></td><td>No</td><td>Yes, if stored as configuration</td></tr>
+    <tr><td><strong>Who can edit</strong></td><td>Developers</td><td>Developers, or admins via a form builder</td></tr>
+    <tr><td><strong>Frontend independence</strong></td><td>Needs an API that serves the metamodel</td><td>Standard format; many off-the-shelf renderers</td></tr>
+    <tr><td><strong>Language independence</strong></td><td>JVM only</td><td>Any backend, any frontend</td></tr>
+    <tr><td><strong>Best for</strong></td><td>Rich domain behaviour, back-office apps</td><td>Dynamic / user-defined forms, polyglot systems</td></tr>
+  </tbody>
+</table>
+
+<h2 id="hybrid">The hybrid: Java as the source, JSON on the wire</h2>
+<p>In practice, the strongest setup combines both:</p>
+
+<pre class="mermaid">
+flowchart LR
+  P["POJO&lt;br/&gt;annotations + Bean Validation&lt;br/&gt;+ supporting methods"] -- "reflection at startup" --&gt; M["ObjectSpec registry"]
+  M -- "serialise" --&gt; J["JSON metadata&lt;br/&gt;GET /api/meta/{type}"]
+  J --&gt; F["Generic frontend&lt;br/&gt;(any framework)"]
+  M --&gt; S["Server-side validation&lt;br/&gt;&amp; action invocation"]
+  F -- "edit / invoke" --&gt; S
+</pre>
+<ul>
+  <li><strong>Java is the single source of truth.</strong> You write the POJO and nothing else.</li>
+  <li><strong>JSON is how the frontend learns about it.</strong> The frontend never imports Java types. It just renders whatever metadata the server sends.</li>
+  <li><strong>Behaviour stays on the server.</strong> Rules run in Java, and their <em>results</em> (disabled reasons, validation messages) travel as JSON.</li>
+  <li><strong>JSON Schema is still available.</strong> Emit it from the same spec for off-the-shelf form libraries, OpenAPI docs, or other consumers.</li>
+</ul>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@GetMapping("/api/meta/{type}")
+public ResponseEntity&lt;ObjectSpec&gt; meta(@PathVariable String type) {
+    return ResponseEntity.ok()
+        .cacheControl(CacheControl.maxAge(Duration.ofHours(1)))   // type metadata is per-deployment
+        .eTag(buildVersion)
+        .body(registry.get(type));                              // Jackson serialises the records
+}</code></pre></div>
+
+<h2 id="choosing">Choosing</h2>
+<table>
+  <thead><tr><th>If…</th><th>Choose</th></tr></thead>
+  <tbody>
+    <tr><td>The domain has real behaviour and rules, built by developers</td><td>Annotations (or the hybrid)</td></tr>
+    <tr><td>Your frontend is a separate SPA (Vue, React)</td><td>Hybrid: annotations on the server, JSON to the client</td></tr>
+    <tr><td>Business users must define new forms without a deploy</td><td>JSON stored as configuration, validated on the server</td></tr>
+    <tr><td>The backend isn't Java, or there are several backends</td><td>JSON (generated by each backend in a shared format)</td></tr>
+    <tr><td>You want a complete generated app with minimal custom frontend</td><td>A framework such as Apache Causeway</td></tr>
+  </tbody>
+</table>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="json-metadata.html"><small>← Previous</small>JSON metadata</a><a class="next" href="rendering.html"><small>Next →</small>Rendering the UI</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/annotations-vs-json.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

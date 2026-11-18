@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A learning reference for domain-driven design (DDD). It covers the strategic ideas that shape a system, the tactical patterns that shape the code, and the judgement calls in between.">
-<title>Domain-Driven Design, explained — DDD Reference</title>
+<meta name="description" content="Write plain domain objects once (POJOs carrying their own data, rules and behaviour) and let the user interface and the REST API be generated from them, described either by Java annotations or by JSON metadata.">
+<title>Domain objects drive the UI — Domain-Driven UI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -17,41 +17,37 @@
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
   <nav class="rail" id="rail" aria-label="Chapters">
-    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="brand" href="index.html">Domain-Driven UI</a>
     <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
     <div class="search">
       <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
       <ol id="search-results" hidden></ol>
     </div>
     <div class="nav-group">Start</div><ol>
-<li><a href="index.html" aria-current="page" class="on">Domain-Driven Design, explained</a></li>
-<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="index.html" aria-current="page" class="on">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
 <li><a href="running-example.html">The running example</a></li>
 </ol>
-<div class="nav-group">Strategic design</div><ol>
-<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
-<li><a href="subdomains.html">Subdomains</a></li>
-<li><a href="discovery.html">Discovering the domain</a></li>
-<li><a href="bounded-contexts.html">Bounded contexts</a></li>
-<li><a href="context-mapping.html">Context mapping</a></li>
-</ol>
-<div class="nav-group">Tactical design</div><ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
 <li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
 <li><a href="aggregates.html">Aggregates</a></li>
-<li><a href="domain-events.html">Domain events</a></li>
-<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
-<li><a href="services.html">Domain &amp; application services</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
 </ol>
-<div class="nav-group">Architecture</div><ol>
-<li><a href="architecture.html">Architecture for a domain model</a></li>
-<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
-<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
 </ol>
 <div class="nav-group">Practice</div><ol>
-<li><a href="testing.html">Testing the model</a></li>
-<li><a href="anti-patterns.html">Anti-patterns</a></li>
-<li><a href="legacy.html">DDD in legacy systems</a></li>
-<li><a href="checklist.html">Design checklist</a></li>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
 </ol>
 <div class="nav-group">Reference</div><ol>
 <li><a href="glossary.html">Glossary</a></li>
@@ -68,82 +64,80 @@
       <article>
         <header class="chapter-head">
           <span class="eyebrow">Start</span>
-          <h1>Domain-Driven Design, explained</h1>
-          <p class="lede">A learning reference for domain-driven design (DDD). It covers the strategic ideas that shape a system, the tactical patterns that shape the code, and the judgement calls in between.</p>
+          <h1>Domain objects drive the UI</h1>
+          <p class="lede">Write plain domain objects once (POJOs carrying their own data, rules and behaviour) and let the user interface and the REST API be generated from them, described either by Java annotations or by JSON metadata.</p>
         </header>
-        <h2 id="what-this-is">What this is</h2>
-<p>Domain-driven design is a way of building software for complicated businesses. It asks you to put the business problem, the <em>domain</em>, at the centre of the design. You build a shared language with the people who know the domain best, then write that language directly into the code.</p>
-<p>This site is a <strong>reference</strong>, not a framework or a starter template. It explains each idea in plain terms, shows a small code example (mostly Java, but the ideas are language-agnostic), and points out the trade-offs and the common ways each idea goes wrong. One fictional business, an event-ticketing company called <a href="running-example.html">Fieldhouse</a>, runs through every chapter so the examples connect.</p>
-
-<div class="callout tip"><span class="label">How to read it</span>
-<p>New to DDD? Read the <strong>Start</strong> and <strong>Strategic design</strong> sections in order before the patterns. Most failed DDD efforts skip straight to entities and repositories and miss the part that matters. If you already know the basics, use the search box (press <kbd>/</kbd>) or jump to the <a href="checklist.html">checklist</a>.</p>
-</div>
-
-<h2 id="the-big-picture">The big picture</h2>
-<p>DDD has two halves. <strong>Strategic design</strong> decides <em>what</em> to build and <em>where the boundaries go</em>. <strong>Tactical design</strong> is a toolkit for building the model <em>inside</em> one of those boundaries.</p>
+        <h2 id="the-idea">The idea in one picture</h2>
+<p>In most applications, one concept such as an <em>Event</em> is written four times: a database entity, a DTO, a REST controller, and a hand-built form and table in the frontend. Every new field means editing all four, and the business rules end up copied in several places.</p>
+<p>This guide is about the alternative. <strong>The domain object is the single source of truth.</strong> You create a POJO for <code>Event</code>, and from that one class the system derives:</p>
+<ul>
+  <li>a <strong>form</strong> for its properties, with the right widget for each type,</li>
+  <li>a <strong>table</strong> for each of its collections,</li>
+  <li>a <strong>button</strong> for each of its business operations (actions),</li>
+  <li>the <strong>validation</strong>, shown in the UI and enforced on the server,</li>
+  <li>and a <strong>REST API</strong> to read and invoke all of it.</li>
+</ul>
 
 <pre class="mermaid">
 flowchart LR
-  subgraph S["Strategic design: the problem &amp; the boundaries"]
-    direction TB
-    UL["Ubiquitous language"] --&gt; SD["Subdomains&lt;br/&gt;core · supporting · generic"]
-    SD --&gt; BC["Bounded contexts"]
-    BC --&gt; CM["Context map"]
+  subgraph Source["Single source of truth"]
+    P["Domain object (POJO)&lt;br/&gt;fields · rules · methods"]
   end
-  subgraph T["Tactical design: the model inside one context"]
-    direction TB
-    VO["Value objects"] --&gt; EN["Entities"]
-    EN --&gt; AG["Aggregates"]
-    AG --&gt; EV["Domain events"]
-    AG --&gt; RE["Repositories"]
-    SV["Domain &amp; application services"]
+  subgraph Describe["Describe it"]
+    A["Java annotations&lt;br/&gt;+ conventions"]
+    J["JSON metadata&lt;br/&gt;(JSON Schema + UI hints)"]
   end
-  S ==&gt; T
+  P --&gt; A
+  P --&gt; J
+  A --&gt; M["Metamodel&lt;br/&gt;properties · collections · actions"]
+  J --&gt; M
+  M --&gt; UI["Generated UI&lt;br/&gt;forms · tables · buttons"]
+  M --&gt; API["Generic REST API"]
+  M --&gt; V["Validation&lt;br/&gt;client + server"]
 </pre>
+
+<p>Add a field to the class and it appears in the form, the API and the validation. Add a method marked as an action and a button appears. Add a new class and it gets its own screens. Nothing else needs to be written by hand.</p>
+
+<h2 id="where-it-comes-from">Where this comes from</h2>
+<p>This approach is called the <strong>Naked Objects</strong> pattern, also known as <em>model-driven</em> or <em>metadata-driven UI</em>. Richard Pawson introduced it around 2000, and it was built on the same insight as domain-driven design: the domain model should be the heart of the system. Naked Objects takes that one step further: <em>the user interacts with the domain objects directly</em>. The <a href="naked-objects.html">next chapter</a> covers its history and principles, and how it relates to classic DDD.</p>
+
+<h2 id="two-paths">Two ways to describe the objects</h2>
+<div class="compare">
+  <div>
+    <h4>Java annotations</h4>
+    <p>The POJO is annotated (<code>@Property</code>, <code>@Action</code>, <code>@NotBlank</code>…). The server uses <strong>reflection</strong> at runtime to read the class and build the metamodel. Frameworks: Apache Causeway, or a small home-grown introspector.</p>
+  </div>
+  <div>
+    <h4>JSON metadata</h4>
+    <p>The object is described in <strong>JSON</strong> (JSON Schema plus a UI schema). A generic frontend renders forms from the JSON. The JSON can be written by hand, stored in a database, or <em>generated</em> from the POJO.</p>
+  </div>
+</div>
+<p>Both paths end at the same place: a <a href="metamodel.html">metamodel</a> that a generic renderer turns into UI. Every chapter shows the same object both ways so you can compare them directly, and <a href="annotations-vs-json.html">Annotations vs. JSON</a> helps you choose.</p>
 
 <h2 id="map">Map of the guide</h2>
 <div class="cards">
-  <a class="card" href="why-ddd.html"><strong>Why DDD?</strong><span>The problem it solves, and when it's overkill.</span></a>
-  <a class="card" href="running-example.html"><strong>The running example</strong><span>Fieldhouse, the ticketing business used throughout.</span></a>
-  <a class="card" href="ubiquitous-language.html"><strong>Ubiquitous language</strong><span>One vocabulary shared by experts, conversations and code.</span></a>
-  <a class="card" href="subdomains.html"><strong>Subdomains</strong><span>Core, supporting, generic: where to invest.</span></a>
-  <a class="card" href="discovery.html"><strong>Discovering the domain</strong><span>Event Storming, Domain Storytelling, Example Mapping.</span></a>
-  <a class="card" href="bounded-contexts.html"><strong>Bounded contexts</strong><span>Where a model applies, and why "one model" fails.</span></a>
-  <a class="card" href="context-mapping.html"><strong>Context mapping</strong><span>How contexts and teams relate to each other.</span></a>
-  <a class="card" href="entities-value-objects.html"><strong>Entities & value objects</strong><span>Identity vs. value; the most useful pattern in DDD.</span></a>
-  <a class="card" href="aggregates.html"><strong>Aggregates</strong><span>Consistency boundaries and how to size them.</span></a>
-  <a class="card" href="domain-events.html"><strong>Domain events</strong><span>Facts that happened, and what they decouple.</span></a>
-  <a class="card" href="repositories-factories.html"><strong>Repositories & factories</strong><span>Getting aggregates in and out of storage.</span></a>
-  <a class="card" href="services.html"><strong>Services</strong><span>Domain services vs. application services.</span></a>
-  <a class="card" href="architecture.html"><strong>Architecture</strong><span>Layers, hexagonal, clean: keeping the domain pure.</span></a>
-  <a class="card" href="integrating-contexts.html"><strong>Integrating contexts</strong><span>Messaging, the outbox, sagas, eventual consistency.</span></a>
-  <a class="card" href="cqrs-event-sourcing.html"><strong>CQRS & event sourcing</strong><span>Powerful, optional, often misapplied.</span></a>
-  <a class="card" href="testing.html"><strong>Testing the model</strong><span>Tests that read like the business rules.</span></a>
-  <a class="card" href="anti-patterns.html"><strong>Anti-patterns</strong><span>Anemic models, god aggregates, and other traps.</span></a>
-  <a class="card" href="legacy.html"><strong>DDD in legacy systems</strong><span>Bubble contexts, ACLs and the strangler fig.</span></a>
-  <a class="card" href="checklist.html"><strong>Checklist</strong><span>Questions to ask at each design stage.</span></a>
+  <a class="card" href="naked-objects.html"><strong>Naked Objects & DDD</strong><span>The pattern, its principles, and its roots in DDD.</span></a>
+  <a class="card" href="running-example.html"><strong>The running example</strong><span>Fieldhouse ticketing: the POJOs and the UI they produce.</span></a>
+  <a class="card" href="ubiquitous-language.html"><strong>Names become the UI</strong><span>Why domain naming matters twice as much here.</span></a>
+  <a class="card" href="entities-value-objects.html"><strong>Entities & value objects</strong><span>Which become pages and which become widgets.</span></a>
+  <a class="card" href="aggregates.html"><strong>Aggregates</strong><span>Object pages, nested tables, and links.</span></a>
+  <a class="card" href="actions.html"><strong>Behaviour as actions</strong><span>Methods become buttons; parameters become dialogs.</span></a>
+  <a class="card" href="metamodel.html"><strong>The metamodel</strong><span>The intermediate description everything is built on.</span></a>
+  <a class="card" href="java-annotations.html"><strong>Java annotations</strong><span>Reflecting POJOs into a metamodel.</span></a>
+  <a class="card" href="json-metadata.html"><strong>JSON metadata</strong><span>JSON Schema, UI schemas, and generating them from POJOs.</span></a>
+  <a class="card" href="annotations-vs-json.html"><strong>Annotations vs. JSON</strong><span>Trade-offs and the hybrid most teams end up with.</span></a>
+  <a class="card" href="rendering.html"><strong>Rendering the UI</strong><span>A generic renderer and a widget registry.</span></a>
+  <a class="card" href="rest-api.html"><strong>The generic REST API</strong><span>A few endpoints that serve every object.</span></a>
+  <a class="card" href="rules.html"><strong>Rules once, enforced everywhere</strong><span>Validation, disabling and hiding from one definition.</span></a>
+  <a class="card" href="customisation.html"><strong>Customisation</strong><span>Layouts, view models, custom widgets, escape hatches.</span></a>
+  <a class="card" href="trade-offs.html"><strong>Trade-offs</strong><span>Where it shines, where it doesn't, and security.</span></a>
   <a class="card" href="glossary.html"><strong>Glossary</strong><span>Every term on one page.</span></a>
-  <a class="card" href="further-reading.html"><strong>Further reading</strong><span>The books and resources worth your time.</span></a>
 </div>
 
-<h2 id="ten-ideas">DDD in ten sentences</h2>
-<ol>
-  <li>Software complexity mostly comes from the <strong>domain</strong>, not the technology, so design effort should go there.</li>
-  <li>Developers and domain experts build a <strong>ubiquitous language</strong> together and use it everywhere, including in the code.</li>
-  <li>A business is made of <strong>subdomains</strong>. Only a few are your competitive edge (the <em>core</em>), and they deserve your best modelling.</li>
-  <li>A single model for the whole business becomes contradictory, so each model lives inside a <strong>bounded context</strong> where its terms have one meaning.</li>
-  <li>Contexts must collaborate. A <strong>context map</strong> makes their relationships, and the team politics behind them, explicit.</li>
-  <li>Inside a context, <strong>value objects</strong> capture concepts defined by their attributes, and <strong>entities</strong> capture things with a lasting identity.</li>
-  <li><strong>Aggregates</strong> group objects that must stay consistent together and are changed only through their root, one per transaction.</li>
-  <li><strong>Domain events</strong> record facts the business cares about and let other aggregates and contexts react without coupling.</li>
-  <li>Keep the domain model free of infrastructure. Persistence, messaging and UI depend on the domain, never the other way round.</li>
-  <li>The model is never finished. Refactor it whenever you learn something deeper about the domain.</li>
-</ol>
-
-<div class="callout"><span class="label">A note on terms</span>
-<p>DDD has a lot of vocabulary. Every term in <strong>bold</strong> on first use is defined in the <a href="glossary.html">glossary</a>.</p>
+<div class="callout"><span class="label">About the code</span>
+<p>Server examples are plain Java (records, Jakarta Bean Validation). Client examples are TypeScript with a small Vue component. Where a snippet uses a home-grown annotation such as <code>@Action</code>, the chapter shows its definition. Where it borrows from a real framework, the chapter says which one.</p>
 </div>
-        <nav class="pager" aria-label="Previous and next"><span></span><a class="next" href="why-ddd.html"><small>Next →</small>Why DDD?</a></nav>
+        <nav class="pager" aria-label="Previous and next"><span></span><a class="next" href="naked-objects.html"><small>Next →</small>Naked Objects &amp; DDD</a></nav>
         <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/index.html">Edit this page on GitHub</a>.</footer>
       </article>
       <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>

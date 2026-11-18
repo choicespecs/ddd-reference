@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The biggest payoff of a model-driven UI is that each business rule is written once, on the domain object, and then shows up in the UI and is enforced by the API automatically.">
+<title>Rules once, enforced everywhere — Domain-Driven UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">Domain-Driven UI</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
+</ol>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html" aria-current="page" class="on">Rules once, enforced everywhere</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / From metadata to UI</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">From metadata to UI</span>
+          <h1>Rules once, enforced everywhere</h1>
+          <p class="lede">The biggest payoff of a model-driven UI is that each business rule is written once, on the domain object, and then shows up in the UI and is enforced by the API automatically.</p>
+        </header>
+        <h2 id="the-problem">The problem it solves</h2>
+<p>In a hand-built application, "an event needs at least one price tier before it can be published" typically appears in three places: a disabled button in the frontend, a check in the controller, and maybe a database constraint. Sooner or later the three disagree.</p>
+<p>In a model-driven application, the rule is written <strong>once</strong>, on <code>Event</code>, and everything else reads it:</p>
+
+<pre class="mermaid">
+flowchart LR
+  R["Event.disablePublish()&lt;br/&gt;'Add at least one price tier first'"]
+  R --&gt; UI["UI: Publish button greyed out&lt;br/&gt;with the reason as tooltip"]
+  R --&gt; API["API: POST …/publish/invoke&lt;br/&gt;rejected with the same reason"]
+  R --&gt; T["Unit test: asserts the reason"]
+</pre>
+
+<h2 id="kinds">Kinds of rules and where they live</h2>
+<table>
+  <thead><tr><th>Rule</th><th>Example</th><th>Written as</th><th>UI effect</th></tr></thead>
+  <tbody>
+    <tr><td>Field constraint</td><td>Name is required, max 120 chars</td><td><code>@NotBlank @Size(max=120)</code></td><td>Required marker, maxlength, inline error</td></tr>
+    <tr><td>Value validity</td><td>Money can't be negative</td><td>Value object constructor</td><td>Error on that widget</td></tr>
+    <tr><td>Visibility</td><td>"Cancel" is not offered for cancelled events</td><td><code>hideCancel()</code></td><td>Button not rendered</td></tr>
+    <tr><td>Usability</td><td>Can't publish without tiers</td><td><code>disablePublish()</code></td><td>Greyed out, with the reason</td></tr>
+    <tr><td>Parameter validity</td><td>Tier capacity ≤ venue capacity</td><td><code>validateAddTier(…)</code></td><td>Error in the dialog</td></tr>
+    <tr><td>Object invariant</td><td>Sum of tier capacities ≤ venue capacity</td><td>Class-level Bean Validation or a check in each action</td><td>Error after the action is submitted</td></tr>
+    <tr><td>Permission</td><td>Only managers can cancel</td><td>Security config per member</td><td>Hidden for others, and rejected by the API</td></tr>
+  </tbody>
+</table>
+
+<h2 id="the-checks-in-order">The order of checks</h2>
+<p>Both the renderer and the API apply the same sequence. The UI uses it to decide what to <em>draw</em>, and the API uses it to decide what to <em>allow</em>. In Naked Objects terminology: <strong>see it, use it, do it</strong>.</p>
+<ol>
+  <li><strong>Can you see it?</strong> Permissions, then <code>hideX()</code>. If not, it doesn't exist for this user, so the API returns 404.</li>
+  <li><strong>Can you use it?</strong> <code>disableX()</code>. If not, the reason is shown, and the API returns an error with the same text.</li>
+  <li><strong>Can you do it with these values?</strong> Bean Validation on the parameters, then <code>validateX(…)</code>, then value-object constructors.</li>
+  <li><strong>Do it</strong>, then check the object's invariants before saving.</li>
+</ol>
+
+<h2 id="testing">Testing rules</h2>
+<p>Because the rules are plain methods on plain objects, they're trivial to unit test, with no UI or HTTP involved:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Test void cannot_publish_an_event_without_price_tiers() {
+    var event = anEvent().withNoTiers().build();
+    assertEquals("Add at least one price tier first", event.disablePublish());
+}
+
+@Test void can_publish_once_a_tier_exists() {
+    var event = anEvent().build();
+    event.addTier("General", Money.of("45.00", "GBP"), 500);
+    assertNull(event.disablePublish());
+}
+
+@Test void cancel_is_hidden_after_cancelling() {
+    var event = anEvent().build();
+    event.cancel("Artist illness");
+    assertTrue(event.hideCancel());
+}</code></pre></div>
+<p>Add one generic API test that proves the invoker enforces <code>disableX</code> for <em>any</em> action. Then you don't need a separate API test per rule.</p>
+
+<div class="callout warn"><span class="label">Never rely on the UI alone</span>
+<p>A greyed-out button is a hint, not a guard. Anyone can call the API directly. Every check the UI performs must also run on the server. The generic invoker in <a href="rest-api.html#invoke">The generic REST API</a> does this for every action automatically, which is exactly why one code path is safer than many.</p>
+</div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="rest-api.html"><small>← Previous</small>The generic REST API</a><a class="next" href="customisation.html"><small>Next →</small>Customisation</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/rules.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

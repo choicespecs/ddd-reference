@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Fieldhouse is a fictional company that sells tickets for live events. Every chapter draws its examples from this one business so the ideas connect.">
-<title>The running example — DDD Reference</title>
+<meta name="description" content="Fieldhouse is a fictional company that sells tickets for live events. Here are its domain objects, and the UI that is generated from them with no hand-written screens.">
+<title>The running example — Domain-Driven UI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -17,41 +17,37 @@
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
   <nav class="rail" id="rail" aria-label="Chapters">
-    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="brand" href="index.html">Domain-Driven UI</a>
     <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
     <div class="search">
       <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
       <ol id="search-results" hidden></ol>
     </div>
     <div class="nav-group">Start</div><ol>
-<li><a href="index.html">Domain-Driven Design, explained</a></li>
-<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="index.html">Domain objects drive the UI</a></li>
+<li><a href="naked-objects.html">Naked Objects &amp; DDD</a></li>
 <li><a href="running-example.html" aria-current="page" class="on">The running example</a></li>
 </ol>
-<div class="nav-group">Strategic design</div><ol>
-<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
-<li><a href="subdomains.html">Subdomains</a></li>
-<li><a href="discovery.html">Discovering the domain</a></li>
-<li><a href="bounded-contexts.html">Bounded contexts</a></li>
-<li><a href="context-mapping.html">Context mapping</a></li>
-</ol>
-<div class="nav-group">Tactical design</div><ol>
+<div class="nav-group">Modelling the objects</div><ol>
+<li><a href="ubiquitous-language.html">Names become the UI</a></li>
 <li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
 <li><a href="aggregates.html">Aggregates</a></li>
-<li><a href="domain-events.html">Domain events</a></li>
-<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
-<li><a href="services.html">Domain &amp; application services</a></li>
+<li><a href="actions.html">Behaviour as actions</a></li>
 </ol>
-<div class="nav-group">Architecture</div><ol>
-<li><a href="architecture.html">Architecture for a domain model</a></li>
-<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
-<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+<div class="nav-group">Describing the objects</div><ol>
+<li><a href="metamodel.html">The metamodel</a></li>
+<li><a href="java-annotations.html">Java annotations</a></li>
+<li><a href="json-metadata.html">JSON metadata</a></li>
+<li><a href="annotations-vs-json.html">Annotations vs. JSON</a></li>
+</ol>
+<div class="nav-group">From metadata to UI</div><ol>
+<li><a href="rendering.html">Rendering the UI</a></li>
+<li><a href="rest-api.html">The generic REST API</a></li>
+<li><a href="rules.html">Rules once, enforced everywhere</a></li>
 </ol>
 <div class="nav-group">Practice</div><ol>
-<li><a href="testing.html">Testing the model</a></li>
-<li><a href="anti-patterns.html">Anti-patterns</a></li>
-<li><a href="legacy.html">DDD in legacy systems</a></li>
-<li><a href="checklist.html">Design checklist</a></li>
+<li><a href="customisation.html">Customisation</a></li>
+<li><a href="trade-offs.html">Trade-offs</a></li>
 </ol>
 <div class="nav-group">Reference</div><ol>
 <li><a href="glossary.html">Glossary</a></li>
@@ -69,50 +65,165 @@
         <header class="chapter-head">
           <span class="eyebrow">Start</span>
           <h1>The running example</h1>
-          <p class="lede">Fieldhouse is a fictional company that sells tickets for live events. Every chapter draws its examples from this one business so the ideas connect.</p>
+          <p class="lede">Fieldhouse is a fictional company that sells tickets for live events. Here are its domain objects, and the UI that is generated from them with no hand-written screens.</p>
         </header>
-        <h2 id="the-business">The business</h2>
-<p>Fieldhouse sells tickets for concerts, conferences and sports events on behalf of organisers. Its pitch to organisers is <strong>fair, fast on-sales</strong>: when 40,000 people try to buy 8,000 tickets at 10:00, the system holds seats briefly, prevents overselling, enforces per-customer limits to fight scalpers, and releases unpaid holds back to the pool.</p>
-<p>Here is how the people who run Fieldhouse describe their day:</p>
-<blockquote>"An organiser sets up an event at a venue and defines the price tiers. When the on-sale opens, a buyer picks seats and we put them on hold for ten minutes. If they pay in time, the hold becomes an order and we issue tickets. If not, the seats go back. At the door, staff scan tickets; each one admits once."</blockquote>
+        <h2 id="the-objects">The domain objects</h2>
+<p>Back-office staff at Fieldhouse set up events, define price tiers and manage holds on seats. The model has four main classes and a few value objects:</p>
 
-<h2 id="contexts">Its bounded contexts</h2>
-<p>Each of these is introduced properly in <a href="subdomains.html">Subdomains</a> and <a href="bounded-contexts.html">Bounded contexts</a>. For now, just notice that each one is a different part of the business with its own concerns.</p>
+<pre class="mermaid">
+classDiagram
+  class Event {
+    EventId id
+    String name
+    Venue venue
+    LocalDateTime onSaleAt
+    EventStatus status
+    List~PriceTier~ tiers
+    publish()
+    addTier(name, price, capacity)
+    cancel(reason)
+  }
+  class PriceTier {
+    String name
+    Money price
+    int capacity
+  }
+  class Venue {
+    VenueId id
+    String name
+    String city
+  }
+  class Hold {
+    HoldId id
+    EmailAddress buyer
+    int seats
+    Instant expiresAt
+    HoldStatus status
+    release()
+  }
+  Event "1" *-- "many" PriceTier : owns
+  Event --&gt; Venue : refers to
+  Hold --&gt; Event : refers to
+</pre>
 
+<h2 id="the-pojo">The Event POJO</h2>
+<p>This is the whole definition of <code>Event</code>. The annotations are described in <a href="java-annotations.html">Java annotations</a>. Everything else is plain Java.</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@DomainObject(plural = "Events", title = "name")
+public class Event {
+
+    @Property(order = 1)
+    @NotBlank @Size(max = 120)
+    private String name;
+
+    @Property(order = 2)
+    @NotNull
+    private Venue venue;                       // reference to another object → link + lookup
+
+    @Property(order = 3, label = "On-sale opens")
+    @NotNull @Future
+    private LocalDateTime onSaleAt;            // → date-time picker
+
+    @Property(order = 4, editable = false)
+    private EventStatus status = EventStatus.DRAFT;   // enum → badge (read-only)
+
+    @Collection(order = 5, label = "Price tiers")
+    private final List&lt;PriceTier&gt; tiers = new ArrayList&lt;&gt;();   // → table
+
+    @Action(order = 1)
+    public void publish() {
+        status = EventStatus.ON_SALE;
+    }
+    public String disablePublish() {           // convention: disable&lt;Action&gt;
+        if (status != EventStatus.DRAFT) return "Only draft events can be published";
+        if (tiers.isEmpty())             return "Add at least one price tier first";
+        return null;                           // null = enabled
+    }
+
+    @Action(order = 2, label = "Add price tier")
+    public PriceTier addTier(@NotBlank String name, @NotNull Money price, @Min(1) int capacity) {
+        var tier = new PriceTier(name, price, capacity);
+        tiers.add(tier);
+        return tier;
+    }
+
+    @Action(order = 3, confirm = "Cancel this event? Buyers will be refunded.")
+    public void cancel(@NotBlank @Size(max = 500) String reason) {
+        status = EventStatus.CANCELLED;
+    }
+    public boolean hideCancel() { return status == EventStatus.CANCELLED; }   // convention: hide&lt;Action&gt;
+}</code></pre></div>
+
+<h2 id="the-generated-ui">The UI it produces</h2>
+<p>A generic renderer reads the metamodel for <code>Event</code> and the current instance's state, and draws this:</p>
+
+<div class="mock">
+  <div class="mock-head">
+    <div><small>Event</small><strong>Summer Jam 2026</strong></div>
+    <div>
+      <span class="mock-btn off" title="Add at least one price tier first">Publish</span>
+      <span class="mock-btn">Add price tier</span>
+      <span class="mock-btn">Cancel</span>
+    </div>
+  </div>
+  <div class="mock-body">
+    <div class="mock-field"><span>Name</span><span class="mock-input">Summer Jam 2026</span></div>
+    <div class="mock-field"><span>Venue</span><span class="mock-input"><a href="#the-generated-ui">Riverside Arena</a> ▾</span></div>
+    <div class="mock-field"><span>On-sale opens</span><span class="mock-input">2026-06-01 10:00 📅</span></div>
+    <div class="mock-field"><span>Status</span><span><span class="tag">DRAFT</span></span></div>
+  </div>
+  <table>
+    <thead><tr><th>Price tiers: Name</th><th>Price</th><th>Capacity</th></tr></thead>
+    <tbody><tr><td colspan="3"><em>No price tiers yet</em></td></tr></tbody>
+  </table>
+  <div class="mock-caption">Generated. "Publish" is greyed out, and its tooltip is the reason returned by <code>disablePublish()</code>.</div>
+</div>
+
+<p>Line by line:</p>
 <table>
-  <thead><tr><th>Context</th><th>What it does</th><th>Subdomain type</th></tr></thead>
+  <thead><tr><th>In the class</th><th>In the UI</th></tr></thead>
   <tbody>
-    <tr><td><strong>Event Planning</strong></td><td>Organisers create events, choose venues and seating plans, and set price tiers and on-sale dates</td><td>Supporting</td></tr>
-    <tr><td><strong>Sales</strong></td><td>Holds, carts, purchase limits, orders; the fairness rules that make on-sales work</td><td><strong>Core</strong></td></tr>
-    <tr><td><strong>Payments</strong></td><td>Charges and refunds through a payment provider</td><td>Generic</td></tr>
-    <tr><td><strong>Admission</strong></td><td>Issuing scannable tickets, and checking people in at the door</td><td>Supporting</td></tr>
-    <tr><td><strong>Notifications</strong></td><td>Emails and push messages to buyers</td><td>Generic</td></tr>
+    <tr><td><code>@DomainObject(title = "name")</code></td><td>Page heading "Summer Jam 2026" and type label "Event"</td></tr>
+    <tr><td><code>String name</code> + <code>@Size(max = 120)</code></td><td>Text box, required, max 120 characters</td></tr>
+    <tr><td><code>Venue venue</code></td><td>A link to the venue's own page, plus a lookup to choose another</td></tr>
+    <tr><td><code>LocalDateTime onSaleAt</code> + <code>@Future</code></td><td>Date-time picker that rejects past dates</td></tr>
+    <tr><td><code>EventStatus status</code>, <code>editable = false</code></td><td>Read-only badge</td></tr>
+    <tr><td><code>List&lt;PriceTier&gt; tiers</code></td><td>Table with one column per <code>PriceTier</code> property</td></tr>
+    <tr><td><code>publish()</code> + <code>disablePublish()</code></td><td>"Publish" button, disabled with an explanation</td></tr>
+    <tr><td><code>addTier(name, price, capacity)</code></td><td>"Add price tier" button that opens a three-field dialog</td></tr>
+    <tr><td><code>cancel(reason)</code> + <code>confirm</code> + <code>hideCancel()</code></td><td>"Cancel" button with a confirmation and a reason field, hidden once cancelled</td></tr>
   </tbody>
 </table>
 
-<pre class="mermaid">
-flowchart LR
-  EP["Event Planning"] -- "EventPublished&lt;br/&gt;(seating plan, tiers)" --&gt; S["Sales"]
-  S -- "charge / refund" --&gt; P["Payments&lt;br/&gt;(wraps provider)"]
-  P -- "PaymentCaptured" --&gt; S
-  S -- "OrderConfirmed" --&gt; A["Admission"]
-  S -- "OrderConfirmed" --&gt; N["Notifications"]
-  A -- "TicketsIssued" --&gt; N
-</pre>
+<h2 id="the-json">The same object as JSON metadata</h2>
+<p>If you take the <a href="json-metadata.html">JSON path</a> instead, the same object is described like this (abridged). The renderer produces the same screen.</p>
 
-<h2 id="why-this-example">Why this example works for learning</h2>
-<ul>
-  <li><strong>Real invariants.</strong> A seat can't be sold twice. A buyer can't exceed the limit of six tickets per event. These rules force careful <a href="aggregates.html">aggregate design</a>.</li>
-  <li><strong>Time matters.</strong> Holds expire and on-sales open at a set time. That shows why domain events and an injectable clock are useful.</li>
-  <li><strong>One word, several meanings.</strong> A "ticket" is a priced line item to Sales and a scannable barcode that admits once to Admission. This is the classic case for <a href="bounded-contexts.html">bounded contexts</a>.</li>
-  <li><strong>Generic pieces you shouldn't build.</strong> Payments and email are solved problems. Recognising that is part of <a href="subdomains.html">strategic design</a>.</li>
-  <li><strong>Scale pressure.</strong> On-sale spikes push you to think about aggregate size, contention and eventual consistency.</li>
-</ul>
+<div class="code"><div class="code-head"><span>JSON</span><button class="copy" type="button">Copy</button></div><pre><code class="language-json">{
+  "type": "Event",
+  "plural": "Events",
+  "titleProperty": "name",
+  "schema": {
+    "type": "object",
+    "required": ["name", "venue", "onSaleAt"],
+    "properties": {
+      "name":     { "type": "string", "maxLength": 120, "title": "Name" },
+      "venue":    { "type": "string", "format": "ref:Venue", "title": "Venue" },
+      "onSaleAt": { "type": "string", "format": "date-time", "title": "On-sale opens" },
+      "status":   { "type": "string", "enum": ["DRAFT", "ON_SALE", "CANCELLED"], "readOnly": true },
+      "tiers":    { "type": "array", "items": { "$ref": "#/$defs/PriceTier" }, "title": "Price tiers" }
+    }
+  },
+  "actions": [
+    { "id": "publish", "label": "Publish" },
+    { "id": "addTier", "label": "Add price tier", "parameters": { "$ref": "#/$defs/AddTierParams" } },
+    { "id": "cancel",  "label": "Cancel", "confirm": "Cancel this event? Buyers will be refunded." }
+  ]
+}</code></pre></div>
 
-<div class="callout"><span class="label">About the code</span>
-<p>Examples use modern Java (records, sealed interfaces) because it is explicit and widely read. Nothing is framework-specific. Each snippet is a sketch that shows one idea, so imports, getters and error handling are trimmed. The same designs translate directly to C#, Kotlin, TypeScript, Python or Go.</p>
+<div class="callout"><span class="label">Adding a new object</span>
+<p>To add a <code>Promotion</code> to the system, write the <code>Promotion</code> class. It gets a list page, a detail page, forms, actions and API endpoints automatically. That's the promise of this approach, and the rest of the guide shows how it works.</p>
 </div>
-        <nav class="pager" aria-label="Previous and next"><a class="prev" href="why-ddd.html"><small>← Previous</small>Why DDD?</a><a class="next" href="ubiquitous-language.html"><small>Next →</small>Ubiquitous language</a></nav>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="naked-objects.html"><small>← Previous</small>Naked Objects &amp; DDD</a><a class="next" href="ubiquitous-language.html"><small>Next →</small>Names become the UI</a></nav>
         <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/running-example.html">Edit this page on GitHub</a>.</footer>
       </article>
       <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>

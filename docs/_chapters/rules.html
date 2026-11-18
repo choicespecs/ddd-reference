@@ -1,0 +1,66 @@
+---
+title: Rules once, enforced everywhere
+lede: The biggest payoff of a model-driven UI is that each business rule is written once, on the domain object, and then shows up in the UI and is enforced by the API automatically.
+---
+
+<h2 id="the-problem">The problem it solves</h2>
+<p>In a hand-built application, "an event needs at least one price tier before it can be published" typically appears in three places: a disabled button in the frontend, a check in the controller, and maybe a database constraint. Sooner or later the three disagree.</p>
+<p>In a model-driven application, the rule is written <strong>once</strong>, on <code>Event</code>, and everything else reads it:</p>
+
+```mermaid
+flowchart LR
+  R["Event.disablePublish()<br/>'Add at least one price tier first'"]
+  R --> UI["UI: Publish button greyed out<br/>with the reason as tooltip"]
+  R --> API["API: POST …/publish/invoke<br/>rejected with the same reason"]
+  R --> T["Unit test: asserts the reason"]
+```
+
+<h2 id="kinds">Kinds of rules and where they live</h2>
+<table>
+  <thead><tr><th>Rule</th><th>Example</th><th>Written as</th><th>UI effect</th></tr></thead>
+  <tbody>
+    <tr><td>Field constraint</td><td>Name is required, max 120 chars</td><td><code>@NotBlank @Size(max=120)</code></td><td>Required marker, maxlength, inline error</td></tr>
+    <tr><td>Value validity</td><td>Money can't be negative</td><td>Value object constructor</td><td>Error on that widget</td></tr>
+    <tr><td>Visibility</td><td>"Cancel" is not offered for cancelled events</td><td><code>hideCancel()</code></td><td>Button not rendered</td></tr>
+    <tr><td>Usability</td><td>Can't publish without tiers</td><td><code>disablePublish()</code></td><td>Greyed out, with the reason</td></tr>
+    <tr><td>Parameter validity</td><td>Tier capacity ≤ venue capacity</td><td><code>validateAddTier(…)</code></td><td>Error in the dialog</td></tr>
+    <tr><td>Object invariant</td><td>Sum of tier capacities ≤ venue capacity</td><td>Class-level Bean Validation or a check in each action</td><td>Error after the action is submitted</td></tr>
+    <tr><td>Permission</td><td>Only managers can cancel</td><td>Security config per member</td><td>Hidden for others, and rejected by the API</td></tr>
+  </tbody>
+</table>
+
+<h2 id="the-checks-in-order">The order of checks</h2>
+<p>Both the renderer and the API apply the same sequence. The UI uses it to decide what to <em>draw</em>, and the API uses it to decide what to <em>allow</em>. In Naked Objects terminology: <strong>see it, use it, do it</strong>.</p>
+<ol>
+  <li><strong>Can you see it?</strong> Permissions, then <code>hideX()</code>. If not, it doesn't exist for this user, so the API returns 404.</li>
+  <li><strong>Can you use it?</strong> <code>disableX()</code>. If not, the reason is shown, and the API returns an error with the same text.</li>
+  <li><strong>Can you do it with these values?</strong> Bean Validation on the parameters, then <code>validateX(…)</code>, then value-object constructors.</li>
+  <li><strong>Do it</strong>, then check the object's invariants before saving.</li>
+</ol>
+
+<h2 id="testing">Testing rules</h2>
+<p>Because the rules are plain methods on plain objects, they're trivial to unit test, with no UI or HTTP involved:</p>
+
+```java
+@Test void cannot_publish_an_event_without_price_tiers() {
+    var event = anEvent().withNoTiers().build();
+    assertEquals("Add at least one price tier first", event.disablePublish());
+}
+
+@Test void can_publish_once_a_tier_exists() {
+    var event = anEvent().build();
+    event.addTier("General", Money.of("45.00", "GBP"), 500);
+    assertNull(event.disablePublish());
+}
+
+@Test void cancel_is_hidden_after_cancelling() {
+    var event = anEvent().build();
+    event.cancel("Artist illness");
+    assertTrue(event.hideCancel());
+}
+```
+<p>Add one generic API test that proves the invoker enforces <code>disableX</code> for <em>any</em> action. Then you don't need a separate API test per rule.</p>
+
+<div class="callout warn"><span class="label">Never rely on the UI alone</span>
+<p>A greyed-out button is a hint, not a guard. Anyone can call the API directly. Every check the UI performs must also run on the server. The generic invoker in <a href="rest-api.html#invoke">The generic REST API</a> does this for every action automatically, which is exactly why one code path is safer than many.</p>
+</div>

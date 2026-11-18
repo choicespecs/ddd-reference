@@ -27,31 +27,27 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "_chapters"
 
-SITE_TITLE = "DDD Reference"
+SITE_TITLE = "Domain-Driven UI"
 REPO_URL = "https://github.com/choicespecs/ddd-reference"
 
 # (group, slug) in reading order. Titles come from each fragment's front matter.
 CHAPTERS: list[tuple[str, str]] = [
     ("Start", "index"),
-    ("Start", "why-ddd"),
+    ("Start", "naked-objects"),
     ("Start", "running-example"),
-    ("Strategic design", "ubiquitous-language"),
-    ("Strategic design", "subdomains"),
-    ("Strategic design", "discovery"),
-    ("Strategic design", "bounded-contexts"),
-    ("Strategic design", "context-mapping"),
-    ("Tactical design", "entities-value-objects"),
-    ("Tactical design", "aggregates"),
-    ("Tactical design", "domain-events"),
-    ("Tactical design", "repositories-factories"),
-    ("Tactical design", "services"),
-    ("Architecture", "architecture"),
-    ("Architecture", "integrating-contexts"),
-    ("Architecture", "cqrs-event-sourcing"),
-    ("Practice", "testing"),
-    ("Practice", "anti-patterns"),
-    ("Practice", "legacy"),
-    ("Practice", "checklist"),
+    ("Modelling the objects", "ubiquitous-language"),
+    ("Modelling the objects", "entities-value-objects"),
+    ("Modelling the objects", "aggregates"),
+    ("Modelling the objects", "actions"),
+    ("Describing the objects", "metamodel"),
+    ("Describing the objects", "java-annotations"),
+    ("Describing the objects", "json-metadata"),
+    ("Describing the objects", "annotations-vs-json"),
+    ("From metadata to UI", "rendering"),
+    ("From metadata to UI", "rest-api"),
+    ("From metadata to UI", "rules"),
+    ("Practice", "customisation"),
+    ("Practice", "trade-offs"),
     ("Reference", "glossary"),
     ("Reference", "further-reading"),
 ]
