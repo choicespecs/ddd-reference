@@ -1,14 +1,5 @@
-# Java / Maven
-backend/target/
-*.class
-*.log
-
-# Node / Vue
-frontend/node_modules/
-frontend/dist/
-
 # IDE / OS
 .idea/
-*.iml
 .vscode/
 .DS_Store
+__pycache__/

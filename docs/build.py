@@ -27,28 +27,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "_chapters"
 
-SITE_TITLE = "DDD Spring + Vue Guide"
+SITE_TITLE = "DDD Reference"
+REPO_URL = "https://github.com/choicespecs/ddd-reference"
 
 # (group, slug) in reading order. Titles come from each fragment's front matter.
 CHAPTERS: list[tuple[str, str]] = [
     ("Start", "index"),
-    ("Start", "data-flow"),
-    ("Concepts", "ddd-fundamentals"),
-    ("Concepts", "strategic-design"),
-    ("Concepts", "tactical-patterns"),
-    ("Architecture", "architecture-styles"),
-    ("Architecture", "project-structure"),
-    ("Backend", "persistence"),
-    ("Backend", "application-layer"),
-    ("Backend", "domain-events"),
-    ("Backend", "rest-api"),
-    ("Frontend", "vue-frontend"),
-    ("Quality & ops", "testing"),
-    ("Quality & ops", "security-config-deploy"),
-    ("Decisions", "decisions"),
-    ("Decisions", "make-it-yours"),
-    ("Reference", "sample-walkthrough"),
+    ("Start", "why-ddd"),
+    ("Start", "running-example"),
+    ("Strategic design", "ubiquitous-language"),
+    ("Strategic design", "subdomains"),
+    ("Strategic design", "discovery"),
+    ("Strategic design", "bounded-contexts"),
+    ("Strategic design", "context-mapping"),
+    ("Tactical design", "entities-value-objects"),
+    ("Tactical design", "aggregates"),
+    ("Tactical design", "domain-events"),
+    ("Tactical design", "repositories-factories"),
+    ("Tactical design", "services"),
+    ("Architecture", "architecture"),
+    ("Architecture", "integrating-contexts"),
+    ("Architecture", "cqrs-event-sourcing"),
+    ("Practice", "testing"),
+    ("Practice", "anti-patterns"),
+    ("Practice", "legacy"),
+    ("Practice", "checklist"),
     ("Reference", "glossary"),
+    ("Reference", "further-reading"),
 ]
 
 FENCE = re.compile(r"^```(\w+)?[^\n]*\n(.*?)\n```[ \t]*$", re.S | re.M)
@@ -117,6 +122,7 @@ PAGE = """<!doctype html>
 <div class="shell">
   <nav class="rail" id="rail" aria-label="Chapters">
     <a class="brand" href="index.html">{site}</a>
+    <a class="repo" href="{repo}">View on GitHub ↗</a>
     <div class="search">
       <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
       <ol id="search-results" hidden></ol>
@@ -138,6 +144,7 @@ PAGE = """<!doctype html>
         </header>
         {body}
         <nav class="pager" aria-label="Previous and next">{prev}{next}</nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="{repo}/edit/main/docs/_chapters/{slug}.html">Edit this page on GitHub</a>.</footer>
       </article>
       <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
     </main>
@@ -146,10 +153,8 @@ PAGE = """<!doctype html>
 <script src="assets/search-index.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script src="assets/site.js"></script>
 </body>
@@ -175,6 +180,8 @@ def main() -> None:
                f'{html.escape(next_c["title"])}</a>') if next_c else "<span></span>"
         page = PAGE.format(
             site=SITE_TITLE,
+            repo=REPO_URL,
+            slug=c["slug"],
             title=html.escape(c["title"]),
             group=html.escape(c["group"]),
             lede_attr=html.escape(c["lede"]),

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Collaborative workshops that get domain knowledge out of experts&#x27; heads and onto a wall, where everyone can see the gaps.">
+<title>Discovering the domain — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html" aria-current="page" class="on">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Strategic design</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Strategic design</span>
+          <h1>Discovering the domain</h1>
+          <p class="lede">Collaborative workshops that get domain knowledge out of experts' heads and onto a wall, where everyone can see the gaps.</p>
+        </header>
+        <h2 id="why-workshops">Why workshops beat interviews</h2>
+<p>Domain knowledge is spread across people, and much of it is tacit: the expert does it but has never had to explain it. Interviews give you each person's partial view one at a time. A shared visual workshop puts the whole flow in front of everyone, and the disagreements surface right away. "Wait, Finance thinks refunds happen <em>before</em> cancellation?"</p>
+
+<h2 id="event-storming">Event Storming</h2>
+<p>Invented by Alberto Brandolini. You model a business process as a timeline of <strong>domain events</strong> (past-tense facts) on sticky notes across a long wall. It has three common levels:</p>
+<table>
+  <thead><tr><th>Level</th><th>Purpose</th><th>Output</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Big Picture</strong></td><td>Explore a whole business line with many stakeholders</td><td>Shared understanding, hotspots, candidate subdomains and boundaries</td></tr>
+    <tr><td><strong>Process Modelling</strong></td><td>Detail one process: who does what, which rules apply</td><td>Commands, policies, read models, external systems</td></tr>
+    <tr><td><strong>Software Design</strong></td><td>Design the model for one context</td><td>Aggregates, their commands and events</td></tr>
+  </tbody>
+</table>
+
+<h3 id="sticky-notes">The sticky-note grammar</h3>
+<table>
+  <thead><tr><th>Colour (convention)</th><th>Element</th><th>Fieldhouse example</th></tr></thead>
+  <tbody>
+    <tr><td>Orange</td><td>Domain event</td><td>Seats Held · Hold Expired · Order Confirmed</td></tr>
+    <tr><td>Blue</td><td>Command</td><td>Place Hold · Pay for Hold</td></tr>
+    <tr><td>Small yellow</td><td>Actor</td><td>Buyer · Organiser · Door Staff</td></tr>
+    <tr><td>Lilac</td><td>Policy ("whenever X, then Y")</td><td>Whenever a hold expires, release its seats</td></tr>
+    <tr><td>Large yellow</td><td>Aggregate / system that decides</td><td>Event Seating · Hold</td></tr>
+    <tr><td>Pink</td><td>External system</td><td>Payment provider</td></tr>
+    <tr><td>Green</td><td>Read model / information needed</td><td>Seat map with availability</td></tr>
+    <tr><td>Red / hot pink</td><td>Hotspot: question, conflict, pain point</td><td>"What if payment succeeds after the hold expired?"</td></tr>
+  </tbody>
+</table>
+
+<pre class="mermaid">
+flowchart LR
+  A(["Buyer"]) --&gt; C1["Place Hold"] --&gt; G1["Event Seating"] --&gt; E1["Seats Held"]
+  E1 --&gt; C2["Pay for Hold"] --&gt; X["Payment provider"] --&gt; E2["Payment Captured"]
+  E2 --&gt; P1{{"Policy: when payment captured, confirm order"}} --&gt; E3["Order Confirmed"]
+  E1 -. "10 min, unpaid" .-&gt; E4["Hold Expired"] --&gt; P2{{"Policy: release seats"}} --&gt; E5["Seats Released"]
+  H["HOTSPOT: payment captured after hold expired?"]
+  E2 -.- H
+</pre>
+
+<div class="callout tip"><span class="label">Hotspots are the point</span>
+<p>The red stickies are the most valuable output. "Payment succeeded after the hold expired" is a real edge case that becomes a business decision: auto-refund, or re-hold if the seats are still free. It's far cheaper to find on a wall than in production.</p>
+</div>
+
+<h3 id="finding-boundaries">Finding boundaries on the wall</h3>
+<ul>
+  <li>Where the <strong>language shifts</strong> ("order" becomes "ticket" becomes "admission")</li>
+  <li>Where <strong>different actors</strong> or departments take over</li>
+  <li>Where a <strong>pivotal event</strong> marks a phase change (Order Confirmed separates selling from admitting)</li>
+  <li>Where <strong>timing</strong> decouples naturally (seconds during an on-sale vs. days until the event)</li>
+</ul>
+
+<h2 id="domain-storytelling">Domain Storytelling</h2>
+<p>Developed by Stefan Hofer and Henning Schwentner. A domain expert tells a concrete story ("Last Friday, Priya bought two seats…") while a moderator draws it as pictographic sentences: <em>actor → activity → work object → to actor</em>, numbered in order. It's good for getting at specific, real cases and for spotting where work objects change name.</p>
+
+<h2 id="example-mapping">Example Mapping</h2>
+<p>From Matt Wynne (Cucumber). For one user story, list its <strong>rules</strong> (blue cards), give each rule concrete <strong>examples</strong> (green), and park <strong>questions</strong> (red). The examples become your test cases almost word for word, which gives a direct line from conversation to <a href="testing.html">tests</a>.</p>
+<div class="tree">Story: Buyer places a hold
+├─ Rule: can't exceed purchase limit (6)
+│   ├─ Example: owns 4, holds 2 → ok
+│   └─ Example: owns 4, holds 3 → rejected: "limit is 6, you already have 4"
+├─ Rule: a seat can only be held by one buyer
+│   └─ Example: A holds 12F; B tries 12F → rejected
+└─ Question: do refunded tickets count toward the limit?</div>
+
+<h2 id="tips">Facilitation tips</h2>
+<ul>
+  <li>Get the <strong>right people</strong> in the room: people who do the work, not only managers who describe it.</li>
+  <li>Use an <strong>unlimited modelling surface</strong>, either a long paper roll or an online whiteboard.</li>
+  <li>Start <strong>chaotic</strong> (everyone writes events silently), then enforce the timeline.</li>
+  <li><strong>Don't resolve every disagreement on the spot</strong>. Mark it as a hotspot and move on.</li>
+  <li>Photograph or export the result, but remember the shared understanding matters more than the artifact.</li>
+</ul>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="subdomains.html"><small>← Previous</small>Subdomains</a><a class="next" href="bounded-contexts.html"><small>Next →</small>Bounded contexts</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/discovery.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+---
+title: Subdomains
+lede: Breaking the business into parts, then deciding which parts deserve your best people and most careful modelling.
+---
+
+<h2 id="problem-vs-solution">Problem space vs. solution space</h2>
+<p>A <strong>domain</strong> is the area of business you're building software for, such as live-event ticketing. A <strong>subdomain</strong> is a coherent part of that business: on-sale fairness, payments, door admission. Subdomains describe the <em>problem space</em>. They exist whether or not any software does.</p>
+<p><a href="bounded-contexts.html">Bounded contexts</a> belong to the <em>solution space</em>. They are the boundaries <em>you</em> choose for models and code. Ideally each subdomain maps to one bounded context, but they're distinct ideas and they don't always line up.</p>
+
+<h2 id="three-types">The three types</h2>
+<table>
+  <thead><tr><th></th><th>Core</th><th>Supporting</th><th>Generic</th></tr></thead>
+  <tbody>
+    <tr><td><strong>What</strong></td><td>What makes the business different and wins customers</td><td>Necessary and specific to you, but not a differentiator</td><td>Solved problems that every business has</td></tr>
+    <tr><td><strong>Complexity</strong></td><td>High</td><td>Low to moderate</td><td>Can be high, but someone else has solved it</td></tr>
+    <tr><td><strong>Change rate</strong></td><td>Frequent; you're experimenting</td><td>Occasional</td><td>Rare (for you)</td></tr>
+    <tr><td><strong>Strategy</strong></td><td>Build in-house, best people, full DDD tactical patterns</td><td>Build simply (CRUD or transaction script), or outsource</td><td>Buy, use SaaS or open source; integrate behind an adapter</td></tr>
+    <tr><td><strong>Fieldhouse</strong></td><td>Sales (holds, limits, fairness)</td><td>Event Planning, Admission</td><td>Payments, Notifications, identity</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip"><span class="label">The key question</span>
+<p>"If we did this <em>exactly</em> as well as our competitors, would we lose anything?" If the answer is no, it isn't core. Spend the modelling effort somewhere else.</p>
+</div>
+
+<h2 id="investment">Matching investment to type</h2>
+
+```mermaid
+quadrantChart
+  title Where to invest modelling effort
+  x-axis Low differentiation --> High differentiation
+  y-axis Low complexity --> High complexity
+  quadrant-1 Core - model deeply
+  quadrant-2 Generic - buy it
+  quadrant-3 Supporting - keep simple
+  quadrant-4 Watch for change
+  Sales: [0.85, 0.85]
+  Payments: [0.15, 0.75]
+  Notifications: [0.1, 0.3]
+  Event Planning: [0.4, 0.35]
+  Admission: [0.35, 0.5]
+```
+
+<ul>
+  <li><strong>Core</strong>: rich domain model, aggregates, thorough tests, constant refinement with experts. This is where DDD's tactical patterns earn their cost.</li>
+  <li><strong>Supporting</strong>: the simplest thing that works. A CRUD module with validation is fine. Don't build aggregates and event buses for a venue-address form.</li>
+  <li><strong>Generic</strong>: integrate a product (a payment provider, an email service) and isolate it behind an <a href="context-mapping.html#acl">anti-corruption layer</a> so it can't distort your model.</li>
+</ul>
+
+<h2 id="distillation">Distilling the core</h2>
+<p>Evans calls the work of separating the core from everything else <strong>distillation</strong>. Useful techniques:</p>
+<ul>
+  <li><strong>Domain vision statement</strong>: one page saying what the core domain is and why it matters. Example: "Fieldhouse wins organisers because on-sales are fair to fans: no overselling, no bots hoarding seats, and released seats get back on sale within seconds."</li>
+  <li><strong>Highlighted core</strong>: mark the core modules explicitly so newcomers know where the important code is.</li>
+  <li><strong>Segregated core</strong>: move supporting logic <em>out</em> of the core modules so the core stays small and readable.</li>
+  <li><strong>Generic subdomain extraction</strong>: when you notice a generic concern (time zones, money, address formats) tangled in the core, pull it out into a library or service.</li>
+</ul>
+
+<h2 id="it-changes">Classifications change</h2>
+<p>A subdomain's type isn't permanent. A supporting subdomain can become core when the strategy shifts. If Fieldhouse decided to compete on "fastest door entry", Admission would become core. A core subdomain can also become generic once the market catches up. Revisit the classification when the business strategy changes.</p>

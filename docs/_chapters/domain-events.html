@@ -1,177 +1,114 @@
 ---
-title: Domain & integration events
-lede: How aggregates announce what happened, how other parts of the system react, and the transaction choices that decide whether you get strong or eventual consistency.
+title: Domain events
+lede: A domain event records something that happened that domain experts care about. Events decouple aggregates and contexts, make side effects explicit, and give you a vocabulary for time.
 ---
 
-<h2 id="two-kinds">Two kinds of events</h2>
+<h2 id="definition">Definition</h2>
+<dl class="def">
+  <dt>Domain event</dt>
+  <dd>An immutable record of a business-significant fact, named in the past tense in the ubiquitous language: <code>SeatsHeld</code>, <code>HoldExpired</code>, <code>OrderConfirmed</code>. It happened, so it can't be rejected, only reacted to.</dd>
+</dl>
+<p>A useful test: would a domain expert say "when <em>that</em> happens, we need to…"? If yes, it's an event. "Row updated" is not a domain event. "Order confirmed" is.</p>
+
+<h2 id="commands-vs-events">Commands vs. events</h2>
 <table>
-  <thead><tr><th></th><th>Domain event</th><th>Integration event</th></tr></thead>
+  <thead><tr><th></th><th>Command</th><th>Event</th></tr></thead>
   <tbody>
-    <tr><td>Audience</td><td>The same bounded context</td><td>Other contexts / services</td></tr>
-    <tr><td>Types used</td><td>Rich domain types (<code>OrderId</code>, <code>Money</code>)</td><td>Primitives only (<code>UUID</code>, <code>int</code>, <code>String</code>)</td></tr>
-    <tr><td>Stability</td><td>Can change whenever the model changes</td><td>A contract; version it carefully</td></tr>
-    <tr><td>Example</td><td><code>ordering.domain.events.OrderPlaced</code></td><td><code>integration.OrderPlacedIntegrationEvent</code></td></tr>
-    <tr><td>Transport (monolith)</td><td>Spring <code>ApplicationEventPublisher</code></td><td>Spring events today; Kafka/RabbitMQ when split</td></tr>
+    <tr><td>Tense</td><td>Imperative: <code>PlaceHold</code></td><td>Past: <code>SeatsHeld</code></td></tr>
+    <tr><td>Intent</td><td>A request that may be rejected</td><td>A fact that already occurred</td></tr>
+    <tr><td>Recipients</td><td>Exactly one handler</td><td>Zero or more subscribers</td></tr>
+    <tr><td>Coupling</td><td>The sender knows who handles it</td><td>The publisher doesn't know who listens</td></tr>
   </tbody>
 </table>
 
-<h2 id="flow">The event flow in this template</h2>
+<h2 id="shape">Shape of an event</h2>
+
+```java
+public sealed interface SalesEvent extends DomainEvent
+        permits SeatsHeld, SeatsReleased, HoldConverted, OrderConfirmed {}
+
+public record OrderConfirmed(
+        EventId eventId,
+        OrderId orderId,
+        BuyerId buyer,
+        Set<SeatId> seats,
+        Money total,
+        Instant occurredAt          // always include when it happened
+) implements SalesEvent {}
+```
+<ul>
+  <li><strong>Immutable</strong> and named in the past tense.</li>
+  <li>Carries <strong>what subscribers need to react</strong>: usually identifiers plus the key facts. Avoid putting whole aggregates in it.</li>
+  <li>Records <strong>when</strong> it occurred, from an injected clock rather than <code>Instant.now()</code>, so it's testable.</li>
+</ul>
+
+<h2 id="raising">Raising events from aggregates</h2>
+<p>The cleanest approach is for the aggregate to <em>record</em> events as part of its state change, and for the application layer to <em>dispatch</em> them after saving. The domain then never needs to know about message buses.</p>
+
+```java
+public abstract class AggregateRoot {
+    private final List<DomainEvent> pending = new ArrayList<>();
+    protected void record(DomainEvent e) { pending.add(e); }
+    public List<DomainEvent> pullEvents() {
+        var out = List.copyOf(pending); pending.clear(); return out;
+    }
+}
+
+// application service: one aggregate per transaction
+@Transactional
+public void payForHold(HoldId holdId, PaymentRef payment) {
+    Hold hold = holds.get(holdId);
+    hold.convertToOrder(payment, clock.instant());   // records HoldConverted
+    holds.save(hold);
+    publisher.publish(hold.pullEvents());           // or: write to an outbox in the same tx
+}
+
+// reactions, each in its own transaction
+@On(HoldConverted.class) void markSeatsSold(HoldConverted e) { /* EventSeating.markSold(e.hold()) */ }
+@On(HoldConverted.class) void createOrder(HoldConverted e)   { /* Order.confirmFrom(e) → records OrderConfirmed */ }
+```
+
+<h2 id="what-they-decouple">What events decouple</h2>
+<ul>
+  <li><strong>Aggregate to aggregate</strong> (same context): <code>HoldExpired</code> leads to <code>EventSeating.release(hold)</code>, and <code>HoldConverted</code> leads to a new <code>Order</code>, each in its own transaction, following the one-aggregate-per-transaction rule.</li>
+  <li><strong>Context to context</strong>: <code>OrderConfirmed</code> triggers Admission to issue tickets and Notifications to send a receipt. Sales doesn't know either of them exists.</li>
+  <li><strong>Core logic and side effects</strong>: auditing, analytics and emails become subscribers instead of lines tangled into the use case.</li>
+</ul>
 
 ```mermaid
 sequenceDiagram
-  participant App as OrderApplicationService
-  participant O as Order
-  participant Bus as Spring event bus
-  participant Tr as IntegrationEventTranslator (ordering)
-  participant H as StockReservationHandler (catalog)
-  App->>O: place(clock)
-  O-->>O: registerEvent(OrderPlaced)
-  App->>App: orders.save(order)
-  App->>O: pullDomainEvents()
-  App->>Bus: publishEvent(OrderPlaced)
-  Bus->>Tr: on(OrderPlaced)
-  Tr->>Bus: publishEvent(OrderPlacedIntegrationEvent)
-  Bus->>H: on(OrderPlacedIntegrationEvent)
-  H->>H: catalog.reserveStock(...) per line
-  Note over App,H: all synchronous, same thread, same transaction
+  participant H as Hold (aggregate)
+  participant App as Application service
+  participant Bus as Event dispatch
+  participant ES as EventSeating
+  participant Adm as Admission ctx
+  participant O as Order (aggregate)
+  App->>H: convertToOrder(payment)
+  H-->>App: records HoldConverted
+  App->>Bus: publish after commit
+  Bus->>ES: markSold(hold)  [own tx]
+  Bus->>O: confirmFrom(hold)  [own tx]
+  O-->>Bus: records OrderConfirmed
+  Bus->>Adm: OrderConfirmed (integration event)
 ```
 
-<h3 id="registering">1. The aggregate registers</h3>
-
-```java
-public void place(Clock clock) {
-    …
-    this.status = OrderStatus.PLACED;
-    registerEvent(new OrderPlaced(id(), snapshotLines(), total(), placedAt));
-}
-```
-<p>The aggregate doesn't publish anything itself. It has no reference to a publisher, which keeps it pure and easy to unit test (<code>order.peekDomainEvents()</code>).</p>
-
-<h3 id="publishing">2. The application service publishes</h3>
-
-```java
-Order saved = orders.save(order);
-order.pullDomainEvents().forEach(events::publishEvent);
-```
-
-<div class="callout"><span class="label">Alternative: Spring Data @DomainEvents</span>
-<p>Spring Data can publish events automatically on <code>save()</code> if the aggregate extends <code>AbstractAggregateRoot</code> (or has a <code>@DomainEvents</code> method). That takes less code, but it couples the domain to Spring Data, and it only fires when you call <code>save()</code> explicitly, not on dirty-checked updates. The template publishes explicitly so the behaviour is visible.</p></div>
-
-<h3 id="translating">3. Translate to the published language</h3>
-
-```java
-@Component
-class IntegrationEventTranslator {
-    @EventListener
-    void on(OrderPlaced e) {
-        publisher.publishEvent(new OrderPlacedIntegrationEvent(e.getOrderId().getValue(), toLines(e.getLines())));
-    }
-}
-```
-
-<h3 id="handling">4. Another context reacts</h3>
-
-```java
-@Component
-class StockReservationHandler {          // in catalog.application — depends only on integration.*
-    @EventListener
-    void on(OrderPlacedIntegrationEvent event) {
-        event.getLines().forEach(l -> catalog.reserveStock(l.getProductId(), l.getQuantity()));
-    }
-}
-```
-
-<h2 id="listener-phases">The critical choice: when does the listener run?</h2>
+<h2 id="domain-vs-integration">Domain events vs. integration events</h2>
+<p>An important distinction once events cross a context boundary:</p>
 <table>
-  <thead><tr><th>Annotation</th><th>Runs</th><th>Failure in listener</th><th>Consistency</th></tr></thead>
+  <thead><tr><th></th><th>Domain event</th><th>Integration event</th></tr></thead>
   <tbody>
-    <tr><td><code>@EventListener</code> (template)</td><td>Immediately, in the publisher's transaction</td><td>Rolls back the whole command</td><td>Strong (atomic)</td></tr>
-    <tr><td><code>@TransactionalEventListener(phase = BEFORE_COMMIT)</code></td><td>Just before commit, same transaction</td><td>Rolls back the whole command</td><td>Strong</td></tr>
-    <tr><td><code>@TransactionalEventListener</code> (default <code>AFTER_COMMIT</code>)</td><td>After a successful commit</td><td>Original change is already committed; the listener's work is lost unless you retry</td><td>Eventual (and fragile without an outbox)</td></tr>
-    <tr><td><code>AFTER_COMMIT</code> + <code>@Async</code></td><td>After commit, on another thread</td><td>Same as above, and the caller doesn't wait</td><td>Eventual</td></tr>
-    <tr><td><code>AFTER_ROLLBACK</code> / <code>AFTER_COMPLETION</code></td><td>After rollback / either</td><td>—</td><td>For compensations/cleanup</td></tr>
+    <tr><td>Audience</td><td>Inside the same bounded context</td><td>Other bounded contexts</td></tr>
+    <tr><td>Shape</td><td>Uses internal model types; free to change</td><td>Primitive, versioned, documented: a <a href="context-mapping.html#ohs">published language</a></td></tr>
+    <tr><td>Transport</td><td>Often in-process</td><td>Message broker, via an outbox</td></tr>
+    <tr><td>Compatibility</td><td>Refactor freely</td><td>Additive changes only; version breaking changes</td></tr>
   </tbody>
 </table>
+<p>Translate domain events into integration events at the boundary. Don't publish your internal model to the world, because every consumer would then be coupled to your refactorings.</p>
 
-<h3 id="why-sync">Why the template uses synchronous listeners for stock</h3>
-<p>The business rule is "never oversell". With a synchronous listener, a failed reservation throws <code>DomainException</code> and the order stays <code>DRAFT</code>, with no partial state and no compensation logic. The integration test <code>overselling_rolls_back_the_whole_placement</code> proves it. The cost is that the two aggregates are locked together for the length of one transaction, which is fine in a monolith with moderate load.</p>
-
-<h3 id="after-commit">When to use AFTER_COMMIT</h3>
-<p>Use it for side effects that shouldn't happen if the transaction rolls back, and whose failure shouldn't undo the business action:</p>
-
-```java
-@Component
-class OrderConfirmationEmailer {
-    @TransactionalEventListener            // AFTER_COMMIT: never email about an order that rolled back
-    @Async                                 // don't make the user wait for SMTP
-    void on(OrderPlaced e) {
-        mailer.sendConfirmation(e.getOrderId());
-    }
-}
-```
-<div class="callout warn"><span class="label">Gotcha</span>
-<p>Inside an <code>AFTER_COMMIT</code> listener, the original transaction is finished. If the listener writes to the database, annotate its service method with <code>@Transactional(propagation = REQUIRES_NEW)</code>. Otherwise the writes are silently never committed.</p></div>
-
-<h2 id="outbox">The transactional outbox</h2>
-<p>When events must leave the process (Kafka, RabbitMQ, a webhook), this naive code is broken:</p>
-
-```java
-@Transactional
-public void place(UUID id) {
-    order.place(clock);
-    orders.save(order);
-    kafka.send("orders", event);   // ❌ sent, then DB commit fails → consumers see a phantom order
-}                                   // ❌ or: DB commits, then the app crashes before send → event lost
-```
-<p>The <strong>outbox pattern</strong> writes the event to an <code>outbox</code> table <em>in the same transaction</em> as the business change. A separate relay process reads the table and publishes, retrying until it succeeds. That gives at-least-once delivery, so consumers must be idempotent.</p>
-
-```mermaid
-flowchart LR
-  A[Application service] -- "same TX" --> T1[(ordering_order)]
-  A -- "same TX" --> T2[(outbox)]
-  R[Relay / poller<br/>or Debezium CDC] -- reads --> T2
-  R -- publishes --> K[[Kafka topic]]
-  K --> C[Consumer<br/>idempotent]
-```
-
-```sql
-CREATE TABLE outbox (
-    id            UUID PRIMARY KEY,
-    aggregate_id  UUID NOT NULL,
-    type          VARCHAR(200) NOT NULL,
-    payload       JSONB NOT NULL,
-    created_at    TIMESTAMPTZ NOT NULL,
-    published_at  TIMESTAMPTZ
-);
-```
-
-<p>Options for implementing it:</p>
+<h2 id="pitfalls">Pitfalls</h2>
 <ul>
-  <li><strong>Spring Modulith's Event Publication Registry</strong> records <code>@ApplicationModuleListener</code> events in a table and republishes incomplete ones on restart. It's the least effort if you adopt Modulith, and it also externalizes events to Kafka/AMQP with <code>@Externalized</code>.</li>
-  <li><strong>Hand-rolled</strong>: an <code>OutboxWriter</code> listener with <code>BEFORE_COMMIT</code> that inserts rows, plus a <code>@Scheduled</code> poller that publishes and marks them sent.</li>
-  <li><strong>Debezium CDC</strong>: tails the database's write-ahead log and publishes outbox rows. This scales best, but it's another piece of infrastructure.</li>
-</ul>
-
-<h2 id="eventual-consistency">Going eventually consistent: what changes</h2>
-<p>If stock reservation became asynchronous, the model would need new states, because "placed" no longer means "stock guaranteed":</p>
-
-```mermaid
-stateDiagram-v2
-  [*] --> DRAFT
-  DRAFT --> PENDING_STOCK: place()
-  PENDING_STOCK --> CONFIRMED: StockReserved
-  PENDING_STOCK --> REJECTED: StockReservationFailed
-  CONFIRMED --> SHIPPED: ship()
-  CONFIRMED --> CANCELLED: cancel() → StockReleased
-  DRAFT --> CANCELLED: cancel()
-```
-<p>This is a small <strong>saga</strong> (a process manager): a sequence of local transactions linked by events, with compensating actions on failure. It's more robust at scale and across services, but it is noticeably more complex for both the code and the UI (which now shows "pending" states). Make that trade-off deliberately.</p>
-
-<h2 id="event-design">Designing good events</h2>
-<ul>
-  <li><strong>Past tense, business language</strong>: <code>OrderPlaced</code>, not <code>OrderStatusChangedToTwo</code>.</li>
-  <li><strong>Immutable</strong> (<code>@Value</code> classes on Java 11, records on 16+) with an <code>occurredAt</code> timestamp.</li>
-  <li><strong>Enough data to act without calling back</strong> (the lines and quantities here). It shouldn't be the whole aggregate, though.</li>
-  <li><strong>Integration events: add fields, never remove or rename them.</strong> If you must break the contract, publish <code>OrderPlacedV2</code> alongside the old event for a while.</li>
-  <li><strong>Consumers are idempotent</strong>. Store processed event IDs, or make the operation naturally idempotent.</li>
+  <li><strong>CRUD events</strong> (<code>HoldUpdated</code>) carry no business meaning. Name what actually happened.</li>
+  <li><strong>Publishing before commit</strong>: subscribers react to something that was then rolled back. Dispatch after commit, or use the <a href="integrating-contexts.html#outbox">transactional outbox</a>.</li>
+  <li><strong>Hidden control flow</strong>: long chains of event handlers are hard to follow. If a process has steps and deadlines, make it explicit with a <a href="integrating-contexts.html#sagas">process manager</a>.</li>
+  <li><strong>Assuming exactly-once delivery</strong>: make handlers <strong>idempotent</strong>, because the same event can arrive twice.</li>
 </ul>

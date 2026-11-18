@@ -1,0 +1,57 @@
+---
+title: Design checklist
+lede: Questions to ask at each stage of a DDD effort. Use this as a review aid in design discussions and pull requests.
+---
+
+<h2 id="before-you-start">Before you start</h2>
+<ul>
+  <li>Is the domain complex enough to justify DDD, or is this mostly CRUD? (<a href="why-ddd.html#when-to-use">Why DDD?</a>)</li>
+  <li>Do we have regular access to people who really understand the business?</li>
+  <li>Can we state in one paragraph what makes this business different? That's the core domain.</li>
+</ul>
+
+<h2 id="strategic">Strategic design</h2>
+<ul>
+  <li>Have we run a collaborative modelling session (Event Storming, Domain Storytelling) with experts in the room?</li>
+  <li>Is there a written glossary <em>per context</em>, and does the code use exactly those terms?</li>
+  <li>Have we classified subdomains as core, supporting or generic, and does our investment match?</li>
+  <li>Are generic subdomains bought or integrated rather than built?</li>
+  <li>Does every bounded context have one owning team?</li>
+  <li>Is every term used with one meaning inside each context?</li>
+  <li>Is there a context map, and does it show upstream/downstream and the relationship pattern for each connection?</li>
+  <li>Is the core domain protected from external models by anti-corruption layers?</li>
+  <li>Does each context own its data, with no shared tables across contexts?</li>
+</ul>
+
+<h2 id="tactical">Tactical design (in complex contexts)</h2>
+<ul>
+  <li>Are domain concepts expressed as value objects instead of primitives?</li>
+  <li>Do entities change state only through methods named in the ubiquitous language (no public setters)?</li>
+  <li>Can you name the invariant(s) each aggregate protects?</li>
+  <li>Are aggregates small, and do they reference other aggregates by id?</li>
+  <li>Does each transaction modify exactly one aggregate?</li>
+  <li>Are cross-aggregate reactions handled through domain events?</li>
+  <li>Are events named in the past tense, and do they carry business meaning (not <code>XUpdated</code>)?</li>
+  <li>Is there one repository per aggregate root, with its interface in the domain?</li>
+  <li>Are application services thin, with no business <code>if</code>s?</li>
+  <li>Is time passed in or injected rather than read from the system clock in the domain?</li>
+</ul>
+
+<h2 id="architecture">Architecture & integration</h2>
+<ul>
+  <li>Does the domain layer compile without any framework or infrastructure dependency?</li>
+  <li>Are dependency rules enforced automatically in the build?</li>
+  <li>Are queries served without loading aggregates (at least CQRS level 1)?</li>
+  <li>Are cross-context messages versioned integration events rather than internal domain events?</li>
+  <li>Are events published reliably (outbox) and consumed idempotently?</li>
+  <li>Are long-running cross-context processes explicit (process manager) with compensations?</li>
+  <li>Has the business agreed on acceptable consistency delays?</li>
+</ul>
+
+<h2 id="ongoing">Ongoing</h2>
+<ul>
+  <li>When a requirement felt awkward to implement, did we revisit the model rather than bolt on a flag?</li>
+  <li>Do domain experts still recognise the language in the code (and in tests)?</li>
+  <li>Have subdomain classifications changed with the business strategy?</li>
+  <li>Are context boundaries still aligned with team boundaries?</li>
+</ul>

@@ -1,132 +1,77 @@
 ---
-title: Start here
-lede: A working Spring Boot + Vue template built the domain-driven way, with the reasoning behind every choice so you can make your own.
+title: Domain-Driven Design, explained
+lede: A learning reference for domain-driven design (DDD). It covers the strategic ideas that shape a system, the tactical patterns that shape the code, and the judgement calls in between.
 ---
 
-<h2 id="what-this-is">What this repository is</h2>
-<p>This repo has two parts that go together:</p>
-<ol>
-  <li><strong>A small working app</strong>: a shop with two <em>bounded contexts</em> (Catalog and Ordering). It has a Spring Boot 2.7 backend (<strong>Java 11</strong>, JPA/Hibernate 5, Flyway, H2 or PostgreSQL) and a Vue 3 + TypeScript frontend. It is small enough to read in an afternoon but uses every pattern you'll need in a real domain-driven app: aggregates, value objects, repositories, domain events, an anti-corruption layer, and architecture tests.</li>
-  <li><strong>This guide</strong>: what DDD is, which architecture choices you have, which ones the template makes and why, and how to adapt it for your own app.</li>
-</ol>
+<h2 id="what-this-is">What this is</h2>
+<p>Domain-driven design is a way of building software for complicated businesses. It asks you to put the business problem, the <em>domain</em>, at the centre of the design. You build a shared language with the people who know the domain best, then write that language directly into the code.</p>
+<p>This site is a <strong>reference</strong>, not a framework or a starter template. It explains each idea in plain terms, shows a small code example (mostly Java, but the ideas are language-agnostic), and points out the trade-offs and the common ways each idea goes wrong. One fictional business, an event-ticketing company called <a href="running-example.html">Fieldhouse</a>, runs through every chapter so the examples connect.</p>
 
-<div class="callout tip"><span class="label">How to use it</span>
-<p>Read <a href="data-flow.html">DB to screen</a> first. It traces one click from the Vue button down to the SQL row and back, which ties all the other chapters together. Then read the concept chapters in order, keeping the code open next to the guide. Every pattern links to the class that implements it.</p></div>
+<div class="callout tip"><span class="label">How to read it</span>
+<p>New to DDD? Read the <strong>Start</strong> and <strong>Strategic design</strong> sections in order before the patterns. Most failed DDD efforts skip straight to entities and repositories and miss the part that matters. If you already know the basics, use the search box (press <kbd>/</kbd>) or jump to the <a href="checklist.html">checklist</a>.</p>
+</div>
 
 <h2 id="the-big-picture">The big picture</h2>
+<p>DDD has two halves. <strong>Strategic design</strong> decides <em>what</em> to build and <em>where the boundaries go</em>. <strong>Tactical design</strong> is a toolkit for building the model <em>inside</em> one of those boundaries.</p>
 
 ```mermaid
 flowchart LR
-  subgraph Browser
-    V[Vue 3 app<br/>features/catalog<br/>features/ordering]
-  end
-  subgraph SpringBoot["Spring Boot (one deployable)"]
+  subgraph S["Strategic design: the problem & the boundaries"]
     direction TB
-    subgraph Catalog["Catalog context"]
-      CW[web] --> CA[application] --> CD[domain]
-      CI[infrastructure] -.implements.-> CD
-    end
-    subgraph Ordering["Ordering context"]
-      OW[web] --> OA[application] --> OD[domain]
-      OI[infrastructure] -.implements.-> OD
-      OI -.implements.-> OA
-    end
-    OI -- "ACL: CatalogAdapter" --> CA
-    OA -- "integration events" --> CA
+    UL["Ubiquitous language"] --> SD["Subdomains<br/>core · supporting · generic"]
+    SD --> BC["Bounded contexts"]
+    BC --> CM["Context map"]
   end
-  DB[(PostgreSQL / H2<br/>Flyway-managed)]
-  V -- "JSON over /api" --> CW
-  V -- "JSON over /api" --> OW
-  CI --> DB
-  OI --> DB
+  subgraph T["Tactical design: the model inside one context"]
+    direction TB
+    VO["Value objects"] --> EN["Entities"]
+    EN --> AG["Aggregates"]
+    AG --> EV["Domain events"]
+    AG --> RE["Repositories"]
+    SV["Domain & application services"]
+  end
+  S ==> T
 ```
-
-<p>Read the diagram from left to right. The browser only ever sees JSON. Each bounded context is a vertical slice with four layers. Dependencies point <em>inward</em> toward the domain. The two contexts talk to each other through only two narrow, deliberate channels.</p>
-
-<h2 id="run-it">Run it in two minutes</h2>
-
-```bash
-# Terminal 1 — backend on :8080 (in-memory H2, seeded with demo products)
-cd backend
-./mvnw spring-boot:run
-
-# Terminal 2 — frontend on :5173 (proxies /api to :8080)
-cd frontend
-npm install
-npm run dev
-```
-
-<p>Open <code>http://localhost:5173</code>. Other useful URLs:</p>
-<table>
-  <thead><tr><th>URL</th><th>What</th></tr></thead>
-  <tbody>
-    <tr><td><code>http://localhost:8080/swagger-ui.html</code></td><td>Interactive OpenAPI docs for every endpoint</td></tr>
-    <tr><td><code>http://localhost:8080/h2-console</code></td><td>Browse the database (JDBC URL <code>jdbc:h2:mem:shop</code>, user <code>sa</code>, empty password)</td></tr>
-    <tr><td><code>http://localhost:8080/actuator/health</code></td><td>Health check</td></tr>
-  </tbody>
-</table>
-<p>To use PostgreSQL instead, run <code>docker compose up -d</code> at the repo root, then <code>./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres</code>.</p>
-
-<h2 id="things-to-try">Things to try in the UI</h2>
-<ul>
-  <li>Start an order and click <strong>Place order</strong> with no lines. The domain rule "Cannot place an empty order" comes back as an error message.</li>
-  <li>Order 5 sticker packs (only 2 are in stock) and place the order. The Catalog context rejects the reservation, and the <em>whole</em> placement rolls back, so the order stays <code>DRAFT</code>.</li>
-  <li>Place an order, check stock in the Catalog, then cancel the order. The stock comes back through an <code>OrderCancelled</code> event.</li>
-  <li>Change a product's price after ordering it. The order keeps the old price, because order lines hold a <em>snapshot</em>.</li>
-</ul>
 
 <h2 id="map">Map of the guide</h2>
 <div class="cards">
-  <a class="card" href="data-flow.html"><strong>DB to screen</strong><span>One request traced through every layer. Read this first.</span></a>
-  <a class="card" href="ddd-fundamentals.html"><strong>DDD fundamentals</strong><span>What DDD is, ubiquitous language, when it pays off.</span></a>
-  <a class="card" href="strategic-design.html"><strong>Strategic design</strong><span>Subdomains, bounded contexts, context maps.</span></a>
-  <a class="card" href="tactical-patterns.html"><strong>Tactical patterns</strong><span>Entities, value objects, aggregates, repositories, services.</span></a>
-  <a class="card" href="architecture-styles.html"><strong>Architecture styles</strong><span>Layered vs hexagonal vs onion vs clean; monolith vs microservices.</span></a>
-  <a class="card" href="project-structure.html"><strong>Project structure</strong><span>Package layout, dependency rules, ArchUnit enforcement.</span></a>
-  <a class="card" href="persistence.html"><strong>Persistence</strong><span>JPA/Hibernate mapping for aggregates, Flyway, locking, N+1.</span></a>
-  <a class="card" href="application-layer.html"><strong>Application layer</strong><span>Use cases, transactions, commands, read models.</span></a>
-  <a class="card" href="domain-events.html"><strong>Events</strong><span>Domain vs integration events, transaction phases, outbox.</span></a>
-  <a class="card" href="rest-api.html"><strong>REST API</strong><span>Task-based endpoints, validation, problem+json errors.</span></a>
-  <a class="card" href="vue-frontend.html"><strong>Vue frontend</strong><span>Structure, API client, state, forms, types from OpenAPI.</span></a>
-  <a class="card" href="testing.html"><strong>Testing</strong><span>Domain unit tests, slices, Testcontainers, ArchUnit.</span></a>
-  <a class="card" href="security-config-deploy.html"><strong>Security & deploy</strong><span>Spring Security, profiles, Docker, serving Vue.</span></a>
-  <a class="card" href="decisions.html"><strong>Decision log</strong><span>Every choice, the alternatives, and when to change it.</span></a>
-  <a class="card" href="make-it-yours.html"><strong>Make it yours</strong><span>Step-by-step: from domain discovery to your first aggregate.</span></a>
-  <a class="card" href="sample-walkthrough.html"><strong>Sample app tour</strong><span>File map, API cookbook with curl, things to extend.</span></a>
+  <a class="card" href="why-ddd.html"><strong>Why DDD?</strong><span>The problem it solves, and when it's overkill.</span></a>
+  <a class="card" href="running-example.html"><strong>The running example</strong><span>Fieldhouse, the ticketing business used throughout.</span></a>
+  <a class="card" href="ubiquitous-language.html"><strong>Ubiquitous language</strong><span>One vocabulary shared by experts, conversations and code.</span></a>
+  <a class="card" href="subdomains.html"><strong>Subdomains</strong><span>Core, supporting, generic: where to invest.</span></a>
+  <a class="card" href="discovery.html"><strong>Discovering the domain</strong><span>Event Storming, Domain Storytelling, Example Mapping.</span></a>
+  <a class="card" href="bounded-contexts.html"><strong>Bounded contexts</strong><span>Where a model applies, and why "one model" fails.</span></a>
+  <a class="card" href="context-mapping.html"><strong>Context mapping</strong><span>How contexts and teams relate to each other.</span></a>
+  <a class="card" href="entities-value-objects.html"><strong>Entities & value objects</strong><span>Identity vs. value; the most useful pattern in DDD.</span></a>
+  <a class="card" href="aggregates.html"><strong>Aggregates</strong><span>Consistency boundaries and how to size them.</span></a>
+  <a class="card" href="domain-events.html"><strong>Domain events</strong><span>Facts that happened, and what they decouple.</span></a>
+  <a class="card" href="repositories-factories.html"><strong>Repositories & factories</strong><span>Getting aggregates in and out of storage.</span></a>
+  <a class="card" href="services.html"><strong>Services</strong><span>Domain services vs. application services.</span></a>
+  <a class="card" href="architecture.html"><strong>Architecture</strong><span>Layers, hexagonal, clean: keeping the domain pure.</span></a>
+  <a class="card" href="integrating-contexts.html"><strong>Integrating contexts</strong><span>Messaging, the outbox, sagas, eventual consistency.</span></a>
+  <a class="card" href="cqrs-event-sourcing.html"><strong>CQRS & event sourcing</strong><span>Powerful, optional, often misapplied.</span></a>
+  <a class="card" href="testing.html"><strong>Testing the model</strong><span>Tests that read like the business rules.</span></a>
+  <a class="card" href="anti-patterns.html"><strong>Anti-patterns</strong><span>Anemic models, god aggregates, and other traps.</span></a>
+  <a class="card" href="legacy.html"><strong>DDD in legacy systems</strong><span>Bubble contexts, ACLs and the strangler fig.</span></a>
+  <a class="card" href="checklist.html"><strong>Checklist</strong><span>Questions to ask at each design stage.</span></a>
+  <a class="card" href="glossary.html"><strong>Glossary</strong><span>Every term on one page.</span></a>
+  <a class="card" href="further-reading.html"><strong>Further reading</strong><span>The books and resources worth your time.</span></a>
 </div>
 
-<div class="callout warn"><span class="label">Why Spring Boot 2.7?</span>
-<p>The project targets <strong>Java 11</strong>. Spring Boot 3 requires Java 17, so this template uses Spring Boot 2.7, the last line that supports Java 11. That means <code>javax.*</code> imports (not <code>jakarta.*</code>) and Hibernate 5.6. Java 11 has no records, so immutable value classes use Lombok's <code>@Value</code>. Open-source support for Boot 2.7 has ended, so plan to move to Java 17+ and Boot 3 when your platform allows. The <a href="decisions.html#adr-java">decision log</a> lists exactly what changes.</p></div>
+<h2 id="ten-ideas">DDD in ten sentences</h2>
+<ol>
+  <li>Software complexity mostly comes from the <strong>domain</strong>, not the technology, so design effort should go there.</li>
+  <li>Developers and domain experts build a <strong>ubiquitous language</strong> together and use it everywhere, including in the code.</li>
+  <li>A business is made of <strong>subdomains</strong>. Only a few are your competitive edge (the <em>core</em>), and they deserve your best modelling.</li>
+  <li>A single model for the whole business becomes contradictory, so each model lives inside a <strong>bounded context</strong> where its terms have one meaning.</li>
+  <li>Contexts must collaborate. A <strong>context map</strong> makes their relationships, and the team politics behind them, explicit.</li>
+  <li>Inside a context, <strong>value objects</strong> capture concepts defined by their attributes, and <strong>entities</strong> capture things with a lasting identity.</li>
+  <li><strong>Aggregates</strong> group objects that must stay consistent together and are changed only through their root, one per transaction.</li>
+  <li><strong>Domain events</strong> record facts the business cares about and let other aggregates and contexts react without coupling.</li>
+  <li>Keep the domain model free of infrastructure. Persistence, messaging and UI depend on the domain, never the other way round.</li>
+  <li>The model is never finished. Refactor it whenever you learn something deeper about the domain.</li>
+</ol>
 
-<h2 id="repo-layout">Repository layout</h2>
-<div class="tree">ddd-spring-vue-template/
-├── backend/                 Spring Boot 2.7 app (Maven, Java 11)
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/com/example/shop/
-│       │   ├── sharedkernel/    Money, AggregateRoot, DomainException…
-│       │   ├── integration/     events shared between contexts
-│       │   ├── catalog/         bounded context: domain/ application/ infrastructure/ web/
-│       │   ├── ordering/        bounded context: domain/ application/ infrastructure/ web/
-│       │   └── config/          cross-cutting Spring config (errors, CORS, Clock)
-│       ├── main/resources/
-│       │   ├── application.yml, application-postgres.yml
-│       │   └── db/migration/    Flyway V1__, V2__ …
-│       └── test/java/…          domain unit tests, API test, ArchUnit rules
-├── frontend/                Vue 3 + Vite + TypeScript
-│   └── src/
-│       ├── api/             http client + one module per context
-│       ├── composables/     useAsync
-│       └── features/        catalog/  ordering/   (mirrors backend contexts)
-├── docs/                    this guide (build.py + _chapters/ → *.html)
-└── docker-compose.yml       PostgreSQL for the postgres profile</div>
-
-<h2 id="editing-the-guide">Editing this guide</h2>
-<p>The guide pages are generated, so you can add your own project's decisions to them. Chapter sources are HTML fragments in <code>docs/_chapters/</code>. Code blocks inside them use triple-backtick fences, and the build escapes them for you. To rebuild:</p>
-
-```bash
-python3 docs/build.py     # regenerates docs/*.html and the search index
-open docs/index.html      # plain files; no server needed
-```
-
-<p>To add a page, create <code>docs/_chapters/my-page.html</code> with a <code>title:</code>/<code>lede:</code> front-matter block, add it to <code>CHAPTERS</code> in <code>build.py</code>, and rebuild.</p>
+<div class="callout"><span class="label">A note on terms</span>
+<p>DDD has a lot of vocabulary. Every term in <strong>bold</strong> on first use is defined in the <a href="glossary.html">glossary</a>.</p>
+</div>

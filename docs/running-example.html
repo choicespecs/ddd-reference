@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Fieldhouse is a fictional company that sells tickets for live events. Every chapter draws its examples from this one business so the ideas connect.">
+<title>The running example — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html" aria-current="page" class="on">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Start</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Start</span>
+          <h1>The running example</h1>
+          <p class="lede">Fieldhouse is a fictional company that sells tickets for live events. Every chapter draws its examples from this one business so the ideas connect.</p>
+        </header>
+        <h2 id="the-business">The business</h2>
+<p>Fieldhouse sells tickets for concerts, conferences and sports events on behalf of organisers. Its pitch to organisers is <strong>fair, fast on-sales</strong>: when 40,000 people try to buy 8,000 tickets at 10:00, the system holds seats briefly, prevents overselling, enforces per-customer limits to fight scalpers, and releases unpaid holds back to the pool.</p>
+<p>Here is how the people who run Fieldhouse describe their day:</p>
+<blockquote>"An organiser sets up an event at a venue and defines the price tiers. When the on-sale opens, a buyer picks seats and we put them on hold for ten minutes. If they pay in time, the hold becomes an order and we issue tickets. If not, the seats go back. At the door, staff scan tickets; each one admits once."</blockquote>
+
+<h2 id="contexts">Its bounded contexts</h2>
+<p>Each of these is introduced properly in <a href="subdomains.html">Subdomains</a> and <a href="bounded-contexts.html">Bounded contexts</a>. For now, just notice that each one is a different part of the business with its own concerns.</p>
+
+<table>
+  <thead><tr><th>Context</th><th>What it does</th><th>Subdomain type</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Event Planning</strong></td><td>Organisers create events, choose venues and seating plans, and set price tiers and on-sale dates</td><td>Supporting</td></tr>
+    <tr><td><strong>Sales</strong></td><td>Holds, carts, purchase limits, orders; the fairness rules that make on-sales work</td><td><strong>Core</strong></td></tr>
+    <tr><td><strong>Payments</strong></td><td>Charges and refunds through a payment provider</td><td>Generic</td></tr>
+    <tr><td><strong>Admission</strong></td><td>Issuing scannable tickets, and checking people in at the door</td><td>Supporting</td></tr>
+    <tr><td><strong>Notifications</strong></td><td>Emails and push messages to buyers</td><td>Generic</td></tr>
+  </tbody>
+</table>
+
+<pre class="mermaid">
+flowchart LR
+  EP["Event Planning"] -- "EventPublished&lt;br/&gt;(seating plan, tiers)" --&gt; S["Sales"]
+  S -- "charge / refund" --&gt; P["Payments&lt;br/&gt;(wraps provider)"]
+  P -- "PaymentCaptured" --&gt; S
+  S -- "OrderConfirmed" --&gt; A["Admission"]
+  S -- "OrderConfirmed" --&gt; N["Notifications"]
+  A -- "TicketsIssued" --&gt; N
+</pre>
+
+<h2 id="why-this-example">Why this example works for learning</h2>
+<ul>
+  <li><strong>Real invariants.</strong> A seat can't be sold twice. A buyer can't exceed the limit of six tickets per event. These rules force careful <a href="aggregates.html">aggregate design</a>.</li>
+  <li><strong>Time matters.</strong> Holds expire and on-sales open at a set time. That shows why domain events and an injectable clock are useful.</li>
+  <li><strong>One word, several meanings.</strong> A "ticket" is a priced line item to Sales and a scannable barcode that admits once to Admission. This is the classic case for <a href="bounded-contexts.html">bounded contexts</a>.</li>
+  <li><strong>Generic pieces you shouldn't build.</strong> Payments and email are solved problems. Recognising that is part of <a href="subdomains.html">strategic design</a>.</li>
+  <li><strong>Scale pressure.</strong> On-sale spikes push you to think about aggregate size, contention and eventual consistency.</li>
+</ul>
+
+<div class="callout"><span class="label">About the code</span>
+<p>Examples use modern Java (records, sealed interfaces) because it is explicit and widely read. Nothing is framework-specific. Each snippet is a sketch that shows one idea, so imports, getters and error handling are trimmed. The same designs translate directly to C#, Kotlin, TypeScript, Python or Go.</p>
+</div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="why-ddd.html"><small>← Previous</small>Why DDD?</a><a class="next" href="ubiquitous-language.html"><small>Next →</small>Ubiquitous language</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/running-example.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

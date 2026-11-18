@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Repositories give the domain the illusion of an in-memory collection of aggregates. Factories hide complex creation. Both keep lifecycle concerns out of the model.">
+<title>Repositories &amp; factories — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html" aria-current="page" class="on">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Tactical design</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Tactical design</span>
+          <h1>Repositories &amp; factories</h1>
+          <p class="lede">Repositories give the domain the illusion of an in-memory collection of aggregates. Factories hide complex creation. Both keep lifecycle concerns out of the model.</p>
+        </header>
+        <h2 id="repositories">Repositories</h2>
+<dl class="def">
+  <dt>Repository</dt>
+  <dd>An abstraction that gives access to aggregates as if they were in an in-memory collection: add one, find one by id, and (for some styles) save one. It hides how and where they're stored.</dd>
+</dl>
+
+<h3 id="rules">Rules of thumb</h3>
+<ul>
+  <li><strong>One repository per aggregate root</strong>, never per child entity. You load and save the whole aggregate.</li>
+  <li><strong>The interface lives in the domain</strong> and is expressed in domain types. The implementation lives in infrastructure. This is dependency inversion, the <em>port</em> in <a href="architecture.html#hexagonal">ports & adapters</a>.</li>
+  <li><strong>Collection-like API</strong>, not a generic DAO: <code>add</code>, <code>get</code>, <code>findBy…</code> for real domain questions. Avoid exposing <code>update(table, column, value)</code>.</li>
+  <li><strong>No business logic.</strong> The repository stores and retrieves. The aggregate decides.</li>
+  <li><strong>Don't use them for reporting.</strong> Screens and reports that join across aggregates should use dedicated <a href="cqrs-event-sourcing.html">read models</a>, not repositories.</li>
+</ul>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// domain layer: a port
+public interface HoldRepository {
+    void add(Hold hold);
+    Hold get(HoldId id);                              // throws HoldNotFound
+    List&lt;Hold&gt; activeExpiringBefore(Instant cutoff);  // a real domain question
+    int seatsHeldOrOwnedBy(BuyerId buyer, EventId event);
+    void save(Hold hold);                             // or rely on unit-of-work tracking
+}</code></pre></div>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// infrastructure layer: an adapter (e.g. JDBC/ORM/document store)
+class SqlHoldRepository implements HoldRepository {
+    private final HoldTable table;          // persistence model, framework-specific
+    private final HoldMapper mapper;        // domain ↔ persistence translation
+
+    public Hold get(HoldId id) {
+        return table.findById(id.value()).map(mapper::toDomain)
+                    .orElseThrow(() -&gt; new HoldNotFound(id));
+    }
+    public void save(Hold hold) {
+        table.save(mapper.toRow(hold));     // version column → optimistic lock
+    }
+    // …
+}</code></pre></div>
+
+<h3 id="collection-vs-persistence">Collection-oriented vs. persistence-oriented</h3>
+<table>
+  <thead><tr><th>Style</th><th>How it works</th><th>Fits</th></tr></thead>
+  <tbody>
+    <tr><td>Collection-oriented</td><td><code>add</code> once. Changes are tracked and flushed by a unit of work (ORM dirty checking)</td><td>Hibernate/JPA, Entity Framework</td></tr>
+    <tr><td>Persistence-oriented</td><td>Explicit <code>save(aggregate)</code> after every change</td><td>Document stores, key-value stores, hand-written SQL, event stores</td></tr>
+  </tbody>
+</table>
+<p>Either is fine. Explicit <code>save</code> is easier to reason about and to swap out, and it makes the one-aggregate-per-transaction rule visible in the code.</p>
+
+<h3 id="testing-repos">In-memory fakes</h3>
+<p>Because the repository is an interface in domain terms, a <code>HashMap</code>-backed fake makes application-layer tests fast and readable. Run the <em>same</em> contract test suite against the fake and the real adapter so they can't drift apart (see <a href="testing.html">Testing</a>).</p>
+
+<h2 id="factories">Factories</h2>
+<dl class="def">
+  <dt>Factory</dt>
+  <dd>Anything whose job is to create a valid aggregate or complex value: a static method, a dedicated class, or a method on another aggregate. It ensures that objects are born satisfying their invariants.</dd>
+</dl>
+
+<h3 id="factory-forms">Forms a factory can take</h3>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// 1. Named static constructor on the aggregate (the most common)
+public static Hold place(BuyerId buyer, EventId event, SeatSelection seats, Instant now) {
+    var hold = new Hold(HoldId.newId(), buyer, event, seats, now.plus(HOLD_DURATION));
+    hold.record(new HoldPlaced(hold.id, buyer, event, seats, now));
+    return hold;
+}
+
+// 2. Factory method on another aggregate: expresses the domain relationship
+Order order = hold.toOrder(payment);          // "an order is created from a hold"
+
+// 3. Dedicated factory class when creation needs collaborators or policies
+public class PricedSelectionFactory {
+    private final PriceTierPolicy tiers;
+    public PricedSelection price(EventId event, SeatSelection seats, PromoCode promo) { … }
+}</code></pre></div>
+
+<h3 id="reconstitution">Creation vs. reconstitution</h3>
+<p>Creating something <em>new</em> enforces rules and records events. <strong>Reconstituting</strong> an existing aggregate from storage must not repeat those checks or re-raise events. A hold that's already expired must still be loadable. Keep the two paths separate: a public factory for creation, and a package-private constructor or mapper for reconstitution.</p>
+
+<div class="callout tip"><span class="label">When you don't need a factory</span>
+<p>If a plain constructor with value-object parameters can create a valid object, use it. Add factories when creation has a domain name ("place a hold"), needs to raise an event, or involves logic that doesn't belong in the constructor.</p>
+</div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="domain-events.html"><small>← Previous</small>Domain events</a><a class="next" href="services.html"><small>Next →</small>Domain &amp; application services</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/repositories-factories.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

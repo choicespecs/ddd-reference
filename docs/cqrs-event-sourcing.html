@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Two patterns that often appear alongside DDD. Both are optional, both are powerful in the right place, and both add real complexity in the wrong one.">
+<title>CQRS &amp; event sourcing — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html" aria-current="page" class="on">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Architecture</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Architecture</span>
+          <h1>CQRS &amp; event sourcing</h1>
+          <p class="lede">Two patterns that often appear alongside DDD. Both are optional, both are powerful in the right place, and both add real complexity in the wrong one.</p>
+        </header>
+        <h2 id="cqrs">CQRS</h2>
+<dl class="def">
+  <dt>Command Query Responsibility Segregation</dt>
+  <dd>Use one model to <em>change</em> state (the write side: aggregates enforcing invariants) and a different model to <em>read</em> it (the read side: views shaped for screens and reports).</dd>
+</dl>
+<p>The motivation is that aggregates are designed for consistency, not for display. A seat map screen wants data from the seating aggregate, price tiers and the venue plan in one fast query. Loading three aggregates and mapping them in memory is slow and awkward. CQRS says: don't force it. Build a read model for that screen.</p>
+
+<pre class="mermaid">
+flowchart LR
+  UI["UI / API"] -- "commands" --&gt; W["Write side&lt;br/&gt;Application service → Aggregates"]
+  W --&gt; WDB[("Write store")]
+  W -- "domain events" --&gt; P["Projector"]
+  P --&gt; RDB[("Read store&lt;br/&gt;seat_map_view")]
+  UI -- "queries" --&gt; Q["Query service"] --&gt; RDB
+</pre>
+
+<h3 id="cqrs-levels">Levels of CQRS</h3>
+<table>
+  <thead><tr><th>Level</th><th>What changes</th><th>When it's enough</th></tr></thead>
+  <tbody>
+    <tr><td>1. Separate query code</td><td>Queries use plain SQL or views and return DTOs; commands use aggregates. Same database</td><td>Most systems. Start here; it's nearly free</td></tr>
+    <tr><td>2. Separate read tables</td><td>Projectors update denormalised tables from events, in the same database</td><td>Expensive screens; complex search</td></tr>
+    <tr><td>3. Separate read stores</td><td>Read models in a different technology (search index, cache, document DB)</td><td>Very different read/write scale; full-text search</td></tr>
+  </tbody>
+</table>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">// Level 1: the query side skips the domain model entirely.
+public class SeatMapQueries {
+    private final Jdbc jdbc;
+    public SeatMapView seatMap(EventId event) {
+        return jdbc.query("""
+            select s.seat_id, s.section, s.row_label, s.status, t.name as tier, t.price
+            from seat_allocation s join price_tier t on t.id = s.tier_id
+            where s.event_id = ?""", event.value()).as(SeatMapView::from);
+    }
+}</code></pre></div>
+
+<div class="callout warn"><span class="label">Costs</span>
+<p>Levels 2 and 3 bring <strong>eventual consistency to your own UI</strong>. A buyer holds a seat, and for a moment the seat map still shows it as available. Handle it with optimistic UI updates, by reading your own writes from the write side, or by explaining the delay in the UI.</p>
+</div>
+
+<h2 id="event-sourcing">Event sourcing</h2>
+<dl class="def">
+  <dt>Event sourcing</dt>
+  <dd>Instead of storing an aggregate's current state, store the full sequence of domain events that happened to it. Current state is rebuilt by replaying those events.</dd>
+</dl>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public class Hold {
+    private HoldStatus status;
+    private Instant expiresAt;
+
+    // Decide: validate the command, return new events. No state change here.
+    public List&lt;HoldEvent&gt; convertToOrder(PaymentRef payment, Instant now) {
+        if (status != ACTIVE)          throw new HoldNotActive(id, status);
+        if (now.isAfter(expiresAt))    throw new HoldAlreadyExpired(id);
+        return List.of(new HoldConverted(id, payment, now));
+    }
+
+    // Evolve: apply an event to state. Must never fail; the event already happened.
+    void apply(HoldEvent e) {
+        switch (e) {
+            case HoldPlaced p    -&gt; { status = ACTIVE; expiresAt = p.expiresAt(); }
+            case HoldConverted c -&gt; status = CONVERTED;
+            case HoldExpired x   -&gt; status = EXPIRED;
+        }
+    }
+
+    static Hold rehydrate(List&lt;HoldEvent&gt; history) {
+        Hold h = new Hold(); history.forEach(h::apply); return h;
+    }
+}</code></pre></div>
+
+<h3 id="es-benefits">Benefits</h3>
+<ul>
+  <li><strong>Complete audit trail</strong> for free, which matters in finance, compliance and disputes.</li>
+  <li><strong>Temporal queries</strong>: "what did this order look like on 3 March?"</li>
+  <li><strong>New read models from history</strong>: build a projection you didn't think of at launch and replay every past event into it.</li>
+  <li><strong>Events are first-class</strong>, so integration and debugging get easier.</li>
+</ul>
+
+<h3 id="es-costs">Costs</h3>
+<ul>
+  <li><strong>Schema evolution</strong>: you keep events forever, so you need upcasters or versioning for old shapes.</li>
+  <li><strong>Read side required</strong>: you can't query "all active holds" from an event stream, so you need CQRS projections.</li>
+  <li><strong>Long streams</strong> need snapshots.</li>
+  <li><strong>Unfamiliar</strong> to most teams; tooling and operations are less mature than for plain databases.</li>
+  <li><strong>Hard to undo</strong>. Moving away from event sourcing later is painful.</li>
+</ul>
+
+<h2 id="when">When to use which</h2>
+<table>
+  <thead><tr><th>Situation</th><th>Recommendation</th></tr></thead>
+  <tbody>
+    <tr><td>Any DDD codebase</td><td>CQRS level 1: keep queries out of aggregates. Almost always worth it</td></tr>
+    <tr><td>Heavy, varied read screens</td><td>CQRS level 2 projections</td></tr>
+    <tr><td>Audit/history is a core business need</td><td>Consider event sourcing <em>for that context</em></td></tr>
+    <tr><td>Supporting or generic context</td><td>Neither; plain CRUD</td></tr>
+    <tr><td>"Event sourcing everything" across the system</td><td>Don't. Choose it per context, deliberately</td></tr>
+  </tbody>
+</table>
+<p>Event sourcing and DDD fit together naturally because domain events are already in your model, but neither requires the other. Most DDD systems store current state, and that's fine.</p>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="integrating-contexts.html"><small>← Previous</small>Integrating bounded contexts</a><a class="next" href="testing.html"><small>Next →</small>Testing the model</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/cqrs-event-sourcing.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="In a DDD codebase the business rules live in plain Java objects, so most of your tests can be fast, Spring-free unit tests. Here is the full test strategy.">
-<title>Testing — DDD Spring + Vue Guide</title>
+<meta name="description" content="A well-isolated domain model is the easiest code in the system to test. Aim for tests that read like the rules domain experts described, run in milliseconds, and survive refactoring.">
+<title>Testing the model — DDD Reference</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -17,281 +17,141 @@
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
   <nav class="rail" id="rail" aria-label="Chapters">
-    <a class="brand" href="index.html">DDD Spring + Vue Guide</a>
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
     <div class="search">
       <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
       <ol id="search-results" hidden></ol>
     </div>
     <div class="nav-group">Start</div><ol>
-<li><a href="index.html">Start here</a></li>
-<li><a href="data-flow.html">DB to screen: the full data flow</a></li>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
 </ol>
-<div class="nav-group">Concepts</div><ol>
-<li><a href="ddd-fundamentals.html">DDD fundamentals</a></li>
-<li><a href="strategic-design.html">Strategic design</a></li>
-<li><a href="tactical-patterns.html">Tactical patterns</a></li>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
 </ol>
 <div class="nav-group">Architecture</div><ol>
-<li><a href="architecture-styles.html">Architecture styles</a></li>
-<li><a href="project-structure.html">Project structure</a></li>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
 </ol>
-<div class="nav-group">Backend</div><ol>
-<li><a href="persistence.html">Persistence with JPA &amp; Hibernate</a></li>
-<li><a href="application-layer.html">Application layer &amp; use cases</a></li>
-<li><a href="domain-events.html">Domain &amp; integration events</a></li>
-<li><a href="rest-api.html">REST API design</a></li>
-</ol>
-<div class="nav-group">Frontend</div><ol>
-<li><a href="vue-frontend.html">Vue frontend</a></li>
-</ol>
-<div class="nav-group">Quality &amp; ops</div><ol>
-<li><a href="testing.html" aria-current="page" class="on">Testing</a></li>
-<li><a href="security-config-deploy.html">Security, config &amp; deployment</a></li>
-</ol>
-<div class="nav-group">Decisions</div><ol>
-<li><a href="decisions.html">Design decisions (ADR log)</a></li>
-<li><a href="make-it-yours.html">Starting your own app</a></li>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html" aria-current="page" class="on">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
 </ol>
 <div class="nav-group">Reference</div><ol>
-<li><a href="sample-walkthrough.html">Sample app tour</a></li>
 <li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
 </ol>
   </nav>
   <div class="main-wrap">
     <header class="topbar">
       <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
-      <span class="crumbs"><a href="index.html">Guide</a> / Quality &amp; ops</span>
+      <span class="crumbs"><a href="index.html">Guide</a> / Practice</span>
       <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
     </header>
     <main id="content">
       <article>
         <header class="chapter-head">
-          <span class="eyebrow">Quality &amp; ops</span>
-          <h1>Testing</h1>
-          <p class="lede">In a DDD codebase the business rules live in plain Java objects, so most of your tests can be fast, Spring-free unit tests. Here is the full test strategy.</p>
+          <span class="eyebrow">Practice</span>
+          <h1>Testing the model</h1>
+          <p class="lede">A well-isolated domain model is the easiest code in the system to test. Aim for tests that read like the rules domain experts described, run in milliseconds, and survive refactoring.</p>
         </header>
-        <h2 id="pyramid">The shape of the test suite</h2>
-
-<pre class="mermaid">
-flowchart TB
-  E2E["E2E (Playwright)&lt;br/&gt;a handful of critical journeys"]
-  INT["Integration (@SpringBootTest + Testcontainers)&lt;br/&gt;wiring, transactions, SQL, events"]
-  SLICE["Slices (@WebMvcTest, @DataJpaTest)&lt;br/&gt;one adapter at a time"]
-  APP["Application service tests&lt;br/&gt;with in-memory fakes"]
-  DOM["Domain unit tests&lt;br/&gt;pure JUnit — the majority"]
-  E2E --- INT --- SLICE --- APP --- DOM
-</pre>
-
+        <h2 id="shape">The shape of the test suite</h2>
 <table>
-  <thead><tr><th>Level</th><th>Tests what</th><th>Speed</th><th>In template</th></tr></thead>
+  <thead><tr><th>Layer</th><th>Test with</th><th>Speed</th><th>Volume</th></tr></thead>
   <tbody>
-    <tr><td>Domain unit</td><td>Invariants, state transitions, value objects, events raised</td><td>~1 ms each</td><td><code>OrderTest</code></td></tr>
-    <tr><td>Architecture</td><td>Dependency rules between layers and contexts</td><td>&lt;1 s total</td><td><code>ArchitectureTest</code></td></tr>
-    <tr><td>Application (fakes)</td><td>Orchestration: loads, saves, publishes, calls ports</td><td>ms</td><td>Example below</td></tr>
-    <tr><td>Web slice</td><td>JSON mapping, validation, status codes</td><td>~1 s context</td><td>Example below</td></tr>
-    <tr><td>JPA slice</td><td>Mappings, custom queries, constraints</td><td>~2 s context</td><td>Example below</td></tr>
-    <tr><td>Full integration</td><td>The whole flow incl. events and rollback</td><td>~3 s context</td><td><code>OrderFlowIntegrationTest</code></td></tr>
+    <tr><td>Value objects</td><td>Plain unit tests, property-based tests</td><td>Microseconds</td><td>Many</td></tr>
+    <tr><td>Aggregates</td><td>Given / when / then on the aggregate; no mocks</td><td>Microseconds</td><td>Many: every invariant</td></tr>
+    <tr><td>Application services</td><td>In-memory fake repositories and a fixed clock</td><td>Milliseconds</td><td>One or two per use case</td></tr>
+    <tr><td>Adapters (repositories, ACLs)</td><td>Integration tests against real infrastructure (e.g. Testcontainers)</td><td>Seconds</td><td>Contract tests per port</td></tr>
+    <tr><td>Context boundaries</td><td>Consumer-driven contract tests</td><td>Seconds</td><td>Per message/API</td></tr>
+    <tr><td>Whole system</td><td>A few end-to-end journeys</td><td>Slow</td><td>Few</td></tr>
   </tbody>
 </table>
 
-<div class="code"><div class="code-head"><span>Shell</span><button class="copy" type="button">Copy</button></div><pre><code class="language-bash">cd backend
-./mvnw test                                   # everything
-./mvnw test -Dtest=OrderTest                  # one class
-./mvnw test -Dtest='OrderTest$Placing'        # one nested group</code></pre></div>
+<h2 id="aggregate-tests">Aggregate tests that read like rules</h2>
+<p>Name tests after the business rules from <a href="discovery.html#example-mapping">Example Mapping</a>. Use builders so each test shows only what matters to it.</p>
 
-<h2 id="domain-tests">Domain unit tests</h2>
-<p>No Spring, no mocks, no database. Build the aggregate, call a method, and assert on the state and the events raised:</p>
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">class EventSeatingTest {
+    Instant onSale = Instant.parse("2026-06-01T10:00:00Z");
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">class OrderTest {
-    private final Clock clock = Clock.fixed(Instant.parse("2026-01-01T10:00:00Z"), ZoneOffset.UTC);
+    @Test void a_seat_cannot_be_held_by_two_buyers() {
+        var seating = aSeating().onSaleAt(onSale).withSeats("12F", "12G").build();
+        seating.hold(buyer("alice"), seats("12F"), onSale.plusSeconds(1));
 
-    @Test
-    void placing_changes_status_and_raises_event() {
-        Order order = Order.startDraft(new CustomerEmail("ada@example.com"), clock);
-        order.addLine(book, "DDD", Money.of("50.00", "USD"), 2);
-
-        order.place(clock);
-
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.PLACED);
-        assertThat(order.getPlacedAt()).isEqualTo(clock.instant());       // deterministic thanks to Clock
-        assertThat(order.peekDomainEvents())
-                .singleElement()
-                .isInstanceOfSatisfying(OrderPlaced.class, e -&gt;
-                        assertThat(e.total()).isEqualTo(Money.of("100.00", "USD")));
+        assertThrows(SeatUnavailable.class,
+            () -&gt; seating.hold(buyer("bob"), seats("12F"), onSale.plusSeconds(2)));
     }
 
-    @Test
-    void placed_order_is_frozen() {
-        …
-        assertThatThrownBy(() -&gt; order.addLine(mug, "Mug", Money.of("1.00", "USD"), 1))
-                .isInstanceOf(DomainException.class)
-                .hasMessageContaining("PLACED");
+    @Test void seats_cannot_be_held_before_the_on_sale_opens() {
+        var seating = aSeating().onSaleAt(onSale).withSeats("12F").build();
+        assertThrows(OnSaleNotOpen.class,
+            () -&gt; seating.hold(buyer("alice"), seats("12F"), onSale.minusSeconds(1)));
+    }
+
+    @Test void releasing_a_hold_makes_its_seats_available_again() {
+        var seating = aSeating().onSaleAt(onSale).withSeats("12F").build();
+        var hold = seating.hold(buyer("alice"), seats("12F"), onSale);
+
+        seating.release(hold);
+
+        assertThat(seating.isAvailable(seat("12F"))).isTrue();
+        assertThat(seating.pullEvents()).last().isInstanceOf(SeatsReleased.class);
     }
 }</code></pre></div>
-<p>Tips:</p>
-<ul>
-  <li><strong>Name tests as rules</strong>: <code>shipped_order_cannot_be_cancelled</code>. The test list then reads like a spec.</li>
-  <li><strong>Inject time.</strong> Pass a <code>Clock</code> instead of calling <code>Instant.now()</code>, and you get deterministic assertions.</li>
-  <li><strong>Group with <code>@Nested</code></strong> by behaviour (Placing, Cancelling).</li>
-  <li><strong>Use test data builders</strong> once construction gets noisy: <code>anOrder().withLine(book, 2).placed().build()</code>.</li>
-</ul>
 
-<h2 id="value-object-tests">Value object tests</h2>
+<h3 id="assert-events">Assert on events, not just state</h3>
+<p>Events are part of the aggregate's public behaviour. Asserting "this command produced <code>SeatsHeld</code> with these seats" tests the business outcome without coupling to internal fields. For event-sourced aggregates this is the natural style: <em>given</em> past events, <em>when</em> a command, <em>then</em> new events (or an error).</p>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">class MoneyTest {
-    @Test void normalizes_scale()        { assertThat(Money.of("5", "USD")).isEqualTo(Money.of("5.00", "USD")); }
-    @Test void rejects_negative()        { assertThatThrownBy(() -&gt; Money.of("-1", "USD")).isInstanceOf(DomainException.class); }
-    @Test void rejects_unknown_currency(){ assertThatThrownBy(() -&gt; Money.of("1", "XYZ")).isInstanceOf(IllegalArgumentException.class); }
-    @Test void cannot_add_mixed_currency(){ assertThatThrownBy(() -&gt; Money.of("1","USD").plus(Money.of("1","EUR"))).isInstanceOf(DomainException.class); }
-}</code></pre></div>
+<h2 id="value-object-tests">Value objects and properties</h2>
+<p>Value objects are pure functions, which makes them ideal for <strong>property-based testing</strong> (jqwik, QuickCheck, Hypothesis, fast-check): state a rule and let the tool search for counter-examples.</p>
 
-<h2 id="application-tests">Application service tests with fakes</h2>
-<p>Ports make this easy. Write a tiny in-memory implementation instead of mocking:</p>
-
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">class InMemoryOrderRepository implements OrderRepository {
-    private final Map&lt;OrderId, Order&gt; store = new HashMap&lt;&gt;();
-    public Optional&lt;Order&gt; findById(OrderId id) { return Optional.ofNullable(store.get(id)); }
-    public List&lt;Order&gt; findRecent(int limit)    { return store.values().stream().limit(limit).collect(toList()); }
-    public Order save(Order o)                  { store.put(o.getId(), o); return o; }
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Property void adding_money_is_commutative(@ForAll("gbp") Money a, @ForAll("gbp") Money b) {
+    assertThat(a.plus(b)).isEqualTo(b.plus(a));
 }
-
-class OrderApplicationServiceTest {
-    InMemoryOrderRepository orders = new InMemoryOrderRepository();
-    ProductCatalog catalog = id -&gt; Optional.of(new OrderableProduct(id, "DDD", Money.of("50", "USD"), true));
-    List&lt;Object&gt; published = new ArrayList&lt;&gt;();
-    OrderApplicationService service = new OrderApplicationService(
-            orders, catalog, published::add, Clock.systemUTC());
-
-    @Test
-    void place_publishes_order_placed() {
-        var view = service.startOrder(new Commands.StartOrder("ada@example.com"));
-        service.addLine(new Commands.AddLine(view.getId(), UUID.randomUUID(), 1));
-
-        service.place(view.getId());
-
-        assertThat(published).hasAtLeastOneElementOfType(OrderPlaced.class);
-    }
-}</code></pre></div>
-<p><code>published::add</code> works because <code>ApplicationEventPublisher</code> is a functional interface. Fakes like this are easier to read and less brittle than chains of Mockito <code>when(...)</code> calls.</p>
-
-<h2 id="web-slice">Web slice: @WebMvcTest</h2>
-
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@WebMvcTest(OrderController.class)
-@Import(GlobalExceptionHandler.class)
-class OrderControllerTest {
-    @Autowired MockMvc mvc;
-    @MockBean OrderApplicationService orders;
-
-    @Test
-    void domain_exception_becomes_409_problem() throws Exception {
-        when(orders.place(any())).thenThrow(new DomainException("Cannot place an empty order"));
-
-        mvc.perform(post("/api/orders/{id}/place", UUID.randomUUID()))
-           .andExpect(status().isConflict())
-           .andExpect(content().contentType("application/problem+json"))
-           .andExpect(jsonPath("$.detail").value("Cannot place an empty order"));
-    }
-
-    @Test
-    void rejects_quantity_over_99() throws Exception {
-        mvc.perform(post("/api/orders/{id}/lines", UUID.randomUUID())
-               .contentType(APPLICATION_JSON)
-               .content("{\"productId\":\"" + UUID.randomUUID() + "\",\"quantity\":100}"))
-           .andExpect(status().isBadRequest());
-        verifyNoInteractions(orders);
-    }
+@Property void limit_never_allows_more_than_max(@ForAll @IntRange(min=0, max=10) int owned,
+                                                @ForAll @IntRange(min=1, max=10) int requested) {
+    var limit = new PurchaseLimit(6);
+    if (owned + requested &gt; 6) assertThrows(PurchaseLimitExceeded.class, () -&gt; limit.check(owned, n(requested)));
+    else assertDoesNotThrow(() -&gt; limit.check(owned, n(requested)));
 }</code></pre></div>
 
-<h2 id="jpa-slice">JPA slice: @DataJpaTest</h2>
-<p>This verifies that the mapping round-trips. It's especially valuable for embeddables, enums, and collections:</p>
+<h2 id="time">Control time</h2>
+<p>Holds expire and on-sales open, so time is a domain input. Never call <code>Instant.now()</code> inside the domain. Pass <code>now</code> into methods, or inject a <code>Clock</code> into application services and use a fixed or mutable clock in tests. This one habit removes a whole class of flaky tests.</p>
 
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@DataJpaTest
-@Import(JpaOrderRepository.class)       // the adapter is package-private: put this test in the same package
-class JpaOrderRepositoryTest {
-    @Autowired OrderRepository orders;
-    @Autowired TestEntityManager em;
-
-    @Test
-    void round_trips_aggregate_with_lines_and_money() {
-        Order order = Order.startDraft(new CustomerEmail("a@b.co"), Clock.systemUTC());
-        order.addLine(UUID.randomUUID(), "DDD", Money.of("54.99", "USD"), 2);
-        orders.save(order);
-        em.flush(); em.clear();                         // force a real reload from SQL
-
-        Order loaded = orders.findById(order.getId()).orElseThrow();
-        assertThat(loaded.getLines()).hasSize(1);
-        assertThat(loaded.total()).isEqualTo(Money.of("109.98", "USD"));
-    }
-}</code></pre></div>
-
-<h2 id="integration">Full integration tests</h2>
-<p><code>OrderFlowIntegrationTest</code> drives the real HTTP layer through MockMvc, against real Flyway migrations, and checks <em>cross-context</em> behaviour, for example:</p>
-
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@Test
-void overselling_rolls_back_the_whole_placement() throws Exception {
-    String orderId = startOrder();
-    addLine(orderId, STICKERS, 5);                 // only 2 in stock
-
-    mvc.perform(post("/api/orders/{id}/place", orderId))
-       .andExpect(status().isConflict())
-       .andExpect(jsonPath("$.detail").value(containsString("Insufficient stock")));
-
-    mvc.perform(get("/api/orders/{id}", orderId))
-       .andExpect(jsonPath("$.status").value("DRAFT"));   // the order change was rolled back too
-}</code></pre></div>
-
-<h2 id="testcontainers">Testcontainers: test against real PostgreSQL</h2>
-<p>H2 is convenient, but it isn't PostgreSQL. For production fidelity, add Testcontainers. On Spring Boot 2.7, start the container once per test class and pass its URL to Spring with <code>@DynamicPropertySource</code>. Boot 3.1+ shortens this to <code>@ServiceConnection</code>.</p>
-
-<div class="code"><div class="code-head"><span>XML</span><button class="copy" type="button">Copy</button></div><pre><code class="language-xml">&lt;!-- versions: import org.testcontainers:testcontainers-bom in &lt;dependencyManagement&gt; --&gt;
-&lt;dependency&gt;
-  &lt;groupId&gt;org.testcontainers&lt;/groupId&gt;
-  &lt;artifactId&gt;postgresql&lt;/artifactId&gt;
-  &lt;scope&gt;test&lt;/scope&gt;
-&lt;/dependency&gt;
-&lt;dependency&gt;
-  &lt;groupId&gt;org.testcontainers&lt;/groupId&gt;
-  &lt;artifactId&gt;junit-jupiter&lt;/artifactId&gt;
-  &lt;scope&gt;test&lt;/scope&gt;
-&lt;/dependency&gt;</code></pre></div>
-
-<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">@SpringBootTest
-@Testcontainers
-class OrderFlowPostgresTest {
-
-    @Container
-    static final PostgreSQLContainer&lt;?&gt; POSTGRES = new PostgreSQLContainer&lt;&gt;("postgres:16-alpine");
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
-
-    @Test
-    void places_an_order_against_real_postgres() { … }
-}</code></pre></div>
-<p>To share one container across many test classes, move the container and the <code>@DynamicPropertySource</code> into an abstract base class that the integration tests extend.</p>
-
-<h2 id="isolation">Test data isolation</h2>
-<table>
-  <thead><tr><th>Approach</th><th>How</th><th>Caveat</th></tr></thead>
-  <tbody>
-    <tr><td><code>@Transactional</code> on the test</td><td>Every test rolls back</td><td>Hides commit-time behaviour (AFTER_COMMIT listeners, flush errors). Don't use it for event tests.</td></tr>
-    <tr><td>Self-restoring tests (template)</td><td>Tests leave data as they found it</td><td>Discipline required</td></tr>
-    <tr><td>Truncate in <code>@BeforeEach</code></td><td><code>JdbcTestUtils.deleteFromTables(jdbc, "ordering_order_line", "ordering_order")</code></td><td>Remember to reseed reference data</td></tr>
-    <tr><td><code>@DirtiesContext</code></td><td>New context per test</td><td>Slow, and an in-memory DB with <code>DB_CLOSE_DELAY=-1</code> survives anyway</td></tr>
-  </tbody>
-</table>
-
-<h2 id="what-not">What <em>not</em> to test</h2>
+<h2 id="fakes-vs-mocks">Fakes over mocks</h2>
 <ul>
-  <li>Getters, Lombok-generated code, and Spring Data derived queries with obvious names.</li>
-  <li>The framework itself (that <code>@Transactional</code> starts a transaction).</li>
-  <li>The same rule at four levels. Test it thoroughly in the domain test, and check once that the wiring works.</li>
+  <li>Use <strong>in-memory fake repositories</strong> rather than mocking <code>repository.get(...)</code> calls. Fakes behave like the real thing, and the tests survive refactoring.</li>
+  <li>Run one <strong>contract test suite</strong> against both the fake and the real adapter so they can't drift.</li>
+  <li><strong>Don't mock domain objects.</strong> They're cheap to create for real, and mocking them tests your mocks, not your rules.</li>
 </ul>
-        <nav class="pager" aria-label="Previous and next"><a class="prev" href="vue-frontend.html"><small>← Previous</small>Vue frontend</a><a class="next" href="security-config-deploy.html"><small>Next →</small>Security, config &amp; deployment</a></nav>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">abstract class HoldRepositoryContract {
+    abstract HoldRepository repository();
+    @Test void finds_holds_expiring_before_a_cutoff() { … }
+}
+class InMemoryHoldRepositoryTest extends HoldRepositoryContract { … }
+class SqlHoldRepositoryIT       extends HoldRepositoryContract { … }   // Testcontainers</code></pre></div>
+
+<h2 id="architecture-tests">Architecture tests</h2>
+<p>Add a handful of automated rules (see <a href="architecture.html#enforcing">Architecture › Enforcing</a>): the domain doesn't depend on infrastructure, contexts only use each other's public API, and so on. They're cheap and they stop slow erosion.</p>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="cqrs-event-sourcing.html"><small>← Previous</small>CQRS &amp; event sourcing</a><a class="next" href="anti-patterns.html"><small>Next →</small>Anti-patterns</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/testing.html">Edit this page on GitHub</a>.</footer>
       </article>
       <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
     </main>
@@ -300,10 +160,8 @@ class OrderFlowPostgresTest {
 <script src="assets/search-index.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/http.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script src="assets/site.js"></script>
 </body>

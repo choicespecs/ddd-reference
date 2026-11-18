@@ -134,3 +134,13 @@ a.card:hover { border-color: var(--accent); }
   .compare { grid-template-columns: 1fr; }
   .adr dl { grid-template-columns: 1fr; }
 }
+
+/* ---------- reference additions ---------- */
+.repo { display: inline-block; font-size: .8rem; color: var(--muted); text-decoration: none; margin: -.6rem 0 1rem; }
+.repo:hover { color: var(--accent); }
+.foot { margin-top: 2rem; font-size: .85rem; color: var(--muted); }
+.def { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1.1rem; margin: 1.2rem 0; }
+.def dt { font-weight: 700; }
+.def dd { margin: .2rem 0 .8rem; color: var(--text); }
+.def dd:last-child { margin-bottom: 0; }
+blockquote { margin: 1.3rem 0; padding: .2rem 0 .2rem 1.1rem; border-left: 3px solid var(--line); color: var(--muted); font-style: italic; }

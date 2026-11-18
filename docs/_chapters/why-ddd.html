@@ -1,0 +1,70 @@
+---
+title: Why DDD?
+lede: What problem domain-driven design solves, what it costs, and how to tell whether your project needs it.
+---
+
+<h2 id="the-problem">The problem: essential complexity</h2>
+<p>Fred Brooks split software complexity into <strong>accidental</strong> complexity, which comes from our tools and choices, and <strong>essential</strong> complexity, which comes from the problem itself. Frameworks, clouds and libraries keep shrinking the accidental part. Nothing shrinks the essential part. If the rules for refunding a partially used season ticket are intricate, the code that implements them will be intricate too.</p>
+<p>Domain-driven design, introduced in Eric Evans' 2003 book <em>Domain-Driven Design: Tackling Complexity in the Heart of Software</em>, is a set of practices for handling essential complexity on purpose instead of by accident.</p>
+
+<h2 id="symptoms">Symptoms DDD addresses</h2>
+<table>
+  <thead><tr><th>Symptom</th><th>What's usually going on</th><th>DDD response</th></tr></thead>
+  <tbody>
+    <tr><td>Developers and the business talk past each other</td><td>Two vocabularies, translated in people's heads (lossily)</td><td><a href="ubiquitous-language.html">Ubiquitous language</a></td></tr>
+    <tr><td>A "simple" change touches 30 files across the codebase</td><td>No boundaries; every concept is shared by everything</td><td><a href="bounded-contexts.html">Bounded contexts</a></td></tr>
+    <tr><td>The <code>Customer</code> class has 80 fields and nobody knows which are used where</td><td>One model trying to serve every department</td><td>Bounded contexts, <a href="context-mapping.html">context maps</a></td></tr>
+    <tr><td>Business rules are scattered across controllers, services, SQL and the UI</td><td>Anemic objects plus procedural "service" scripts</td><td><a href="entities-value-objects.html">Rich domain model</a>, <a href="aggregates.html">aggregates</a></td></tr>
+    <tr><td>Invalid states show up in production data</td><td>Nothing enforces invariants in one place</td><td>Value objects and aggregates that make illegal states unrepresentable</td></tr>
+    <tr><td>Engineering effort spreads evenly, so the differentiator gets no more care than the login page</td><td>No sense of what matters most</td><td><a href="subdomains.html">Core domain</a> distillation</td></tr>
+  </tbody>
+</table>
+
+<h2 id="what-ddd-is-not">What DDD is not</h2>
+<ul>
+  <li><strong>Not a framework or architecture.</strong> There's nothing to install. Hexagonal architecture, CQRS and microservices pair well with DDD, but they are separate ideas.</li>
+  <li><strong>Not "entities, repositories and services" folders.</strong> That is sometimes called <em>DDD-lite</em>: the tactical patterns without the strategic thinking. It brings most of the ceremony and few of the benefits.</li>
+  <li><strong>Not a big up-front design.</strong> Modelling is continuous. You expect your understanding, and so the model, to deepen over time.</li>
+  <li><strong>Not microservices.</strong> Bounded contexts often make good service boundaries, but a well-modularised monolith is a perfectly good home for several contexts.</li>
+</ul>
+
+<h2 id="when-to-use">When it pays off, and when it doesn't</h2>
+<div class="compare">
+  <div class="good">
+    <h4>Good fit</h4>
+    <ul>
+      <li>Rich business rules that change often</li>
+      <li>The software <em>is</em> the competitive advantage</li>
+      <li>Access to domain experts who will talk to you</li>
+      <li>A long-lived system with several teams</li>
+      <li>Concepts mean different things to different departments</li>
+    </ul>
+  </div>
+  <div class="bad">
+    <h4>Poor fit</h4>
+    <ul>
+      <li>CRUD over a database with little logic (forms in, rows out)</li>
+      <li>A throwaway prototype or a short-lived tool</li>
+      <li>A purely technical problem (a compiler, a cache, a codec)</li>
+      <li>A generic capability you could buy (billing, auth, email)</li>
+      <li>No one available who understands the business</li>
+    </ul>
+  </div>
+</div>
+<p>A reasonable rule of thumb: <strong>strategic DDD is almost always worth it</strong>. Talking to experts, naming things well, and drawing boundaries are cheap and help any non-trivial system. <strong>Tactical DDD is worth it where the logic is complex</strong>, typically in the core subdomain. Elsewhere, a simple transaction script or CRUD module is a legitimate, even preferable, choice.</p>
+
+<div class="callout warn"><span class="label">Cost</span>
+<p>DDD takes time with domain experts, discipline about boundaries, and more types (value objects, events, ports) than a naive design. Those costs are real. They pay back when the domain is complicated and the system will live for years. They don't pay back for a weekend project.</p>
+</div>
+
+<h2 id="the-core-loop">The core loop</h2>
+<p>Most of DDD comes down to a loop you repeat for the life of the system:</p>
+
+```mermaid
+flowchart LR
+  A["Talk with domain experts<br/>using concrete scenarios"] --> B["Refine the language<br/>& find boundaries"]
+  B --> C["Express the model<br/>in code"]
+  C --> D["Code & tests expose<br/>awkward spots"]
+  D --> A
+```
+<p>When the code feels awkward (a method that needs six flags, a class nobody can name), that is often a sign the model is missing a concept. Evans calls the moment you find it a <strong>breakthrough</strong>: a refactoring toward deeper insight that simplifies everything around it.</p>

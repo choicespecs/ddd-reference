@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Two kinds of domain object. An entity is defined by identity that lasts through change; a value object is defined entirely by its attributes. Getting this distinction right simplifies everything else.">
+<title>Entities &amp; value objects — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html" aria-current="page" class="on">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Tactical design</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Tactical design</span>
+          <h1>Entities &amp; value objects</h1>
+          <p class="lede">Two kinds of domain object. An entity is defined by identity that lasts through change; a value object is defined entirely by its attributes. Getting this distinction right simplifies everything else.</p>
+        </header>
+        <h2 id="the-question">The question to ask</h2>
+<p>For any concept, ask: <strong>"If two of these have identical attributes, are they the same thing?"</strong></p>
+<ul>
+  <li>Two £45.00 amounts? Interchangeable, so it's a <strong>value object</strong>.</li>
+  <li>Two orders with identical lines? Still two different orders, so it's an <strong>entity</strong>.</li>
+  <li>Seat "Section B, Row 12, Seat F" at one venue? It depends on the context. In Planning, a seat's attributes <em>are</em> its identity (a value). In Sales, the seat's availability changes over time for a specific event, so availability is tracked by an entity.</li>
+</ul>
+
+<h2 id="value-objects">Value objects</h2>
+<dl class="def">
+  <dt>Value object</dt>
+  <dd>An immutable object with no identity, defined and compared only by its attributes. It validates itself on creation and carries the behaviour that belongs to the concept.</dd>
+</dl>
+
+<h3 id="vo-properties">Properties</h3>
+<ul>
+  <li><strong>Immutable.</strong> You replace it rather than modify it: <code>total = total.plus(fee)</code>.</li>
+  <li><strong>Structural equality.</strong> Equal when all attributes are equal.</li>
+  <li><strong>Self-validating.</strong> An invalid instance can't exist, so code that receives one never has to re-check it.</li>
+  <li><strong>Behaviour-rich.</strong> Arithmetic, comparison, formatting and conversions live on the type, not in a <code>MoneyUtils</code> class.</li>
+  <li><strong>Side-effect free.</strong> Methods return new values instead of changing state, so they're trivially safe to share and test.</li>
+</ul>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public record Money(BigDecimal amount, Currency currency) {
+    public Money {
+        Objects.requireNonNull(amount); Objects.requireNonNull(currency);
+        if (amount.scale() &gt; currency.getDefaultFractionDigits())
+            throw new IllegalArgumentException("Too many decimal places for " + currency);
+        if (amount.signum() &lt; 0)
+            throw new IllegalArgumentException("Money cannot be negative");
+    }
+    public static Money of(String amount, String currency) {
+        return new Money(new BigDecimal(amount), Currency.getInstance(currency));
+    }
+    public Money plus(Money other) {
+        requireSameCurrency(other);
+        return new Money(amount.add(other.amount), currency);
+    }
+    public Money times(int quantity) {
+        return new Money(amount.multiply(BigDecimal.valueOf(quantity)), currency);
+    }
+    private void requireSameCurrency(Money other) {
+        if (!currency.equals(other.currency)) throw new CurrencyMismatch(this, other);
+    }
+}</code></pre></div>
+
+<h3 id="primitive-obsession">Curing primitive obsession</h3>
+<p>Using raw <code>String</code>, <code>int</code> and <code>BigDecimal</code> for domain concepts is called <strong>primitive obsession</strong>. It's the most common and cheapest thing to fix with DDD. Compare:</p>
+<div class="compare">
+  <div class="bad">
+    <h4>Primitives</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">void placeHold(String buyerId, String eventId,
+               List&lt;String&gt; seats, int limit)
+// which string is which? is limit validated?</code></pre></div>
+  </div>
+  <div class="good">
+    <h4>Value objects</h4>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">Hold placeHold(BuyerId buyer, EventId event,
+               SeatSelection seats, PurchaseLimit limit)
+// can't swap arguments; each one is already valid</code></pre></div>
+  </div>
+</div>
+<p>Good candidates in almost any domain: identifiers (<code>OrderId</code>), money, quantities with units, email addresses, date ranges, percentages, and codes with a format.</p>
+
+<h3 id="vo-collections">Value objects can hold rules</h3>
+<p>A value object can encapsulate a rule about a <em>group</em> of values. That turns scattered checks into one tested type:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public record SeatSelection(Set&lt;SeatId&gt; seats) {
+    public SeatSelection {
+        if (seats.isEmpty()) throw new IllegalArgumentException("Select at least one seat");
+        seats = Set.copyOf(seats);                  // defensive, immutable copy
+    }
+    public int count() { return seats.size(); }
+}
+
+public record PurchaseLimit(int max) {
+    public PurchaseLimit { if (max &lt; 1) throw new IllegalArgumentException("limit must be ≥ 1"); }
+    public void check(int alreadyOwned, SeatSelection requested) {
+        if (alreadyOwned + requested.count() &gt; max)
+            throw new PurchaseLimitExceeded(max, alreadyOwned, requested.count());
+    }
+}</code></pre></div>
+
+<h2 id="entities">Entities</h2>
+<dl class="def">
+  <dt>Entity</dt>
+  <dd>An object with a distinct identity that stays the same through changes to its attributes and across its lifecycle. Equality is by identity only.</dd>
+</dl>
+
+<h3 id="entity-properties">Properties</h3>
+<ul>
+  <li><strong>Identity</strong>: assigned once and never changed. Prefer generating it in the domain (UUIDs or ULIDs) over relying on database sequences, so an entity has its id before it is saved.</li>
+  <li><strong>Lifecycle</strong>: entities are created, change state through meaningful operations, and are often archived rather than deleted.</li>
+  <li><strong>Behaviour, not setters</strong>: state changes go through methods named in the ubiquitous language, and those methods enforce the rules.</li>
+  <li><strong>Equality by id</strong>: <code>equals</code>/<code>hashCode</code> use only the identifier.</li>
+</ul>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public class Hold {
+    private final HoldId id;
+    private final BuyerId buyer;
+    private final SeatSelection seats;
+    private final Instant expiresAt;
+    private HoldStatus status = HoldStatus.ACTIVE;
+
+    // ✗ no setStatus(), no setExpiresAt()
+
+    public void convertToOrder(PaymentRef payment, Instant now) {
+        if (status != HoldStatus.ACTIVE) throw new HoldNotActive(id, status);
+        if (now.isAfter(expiresAt))      throw new HoldAlreadyExpired(id);
+        status = HoldStatus.CONVERTED;
+        // … record event
+    }
+
+    public void expire(Instant now) {
+        if (status == HoldStatus.ACTIVE &amp;&amp; !now.isBefore(expiresAt)) status = HoldStatus.EXPIRED;
+    }
+
+    @Override public boolean equals(Object o) { return o instanceof Hold h &amp;&amp; h.id.equals(id); }
+    @Override public int hashCode() { return id.hashCode(); }
+}</code></pre></div>
+
+<h2 id="prefer-values">Prefer value objects</h2>
+<p>Value objects are simpler to reason about, test and share. When in doubt, model a concept as a value and promote it to an entity only when you need to track it through change. A healthy domain model usually has <strong>more value objects than entities</strong>, and entities tend to be thin shells that coordinate rich values.</p>
+
+<h2 id="make-illegal-states-unrepresentable">Make illegal states unrepresentable</h2>
+<p>Push rules into types so invalid combinations can't be expressed at all. Sealed types are a good tool for state that carries different data in different stages:</p>
+
+<div class="code"><div class="code-head"><span>Java</span><button class="copy" type="button">Copy</button></div><pre><code class="language-java">public sealed interface HoldOutcome {
+    record Converted(OrderId order, PaymentRef payment) implements HoldOutcome {}
+    record Expired(Instant at)                          implements HoldOutcome {}
+    record Cancelled(CancelReason reason)               implements HoldOutcome {}
+}
+// No "status = CONVERTED but orderId == null" is possible.</code></pre></div>
+
+<h2 id="persistence-note">A note on persistence</h2>
+<p>Some ORMs push you toward no-arg constructors and mutable fields. Common ways to keep the model clean anyway: map value objects as embedded or owned types, use field access with a protected constructor reserved for the ORM, or keep separate persistence models and map between them in the <a href="repositories-factories.html">repository</a>. Pick the least-invasive option your stack allows, and don't let the database schema dictate the domain design.</p>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="context-mapping.html"><small>← Previous</small>Context mapping</a><a class="next" href="aggregates.html"><small>Next →</small>Aggregates</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/entities-value-objects.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

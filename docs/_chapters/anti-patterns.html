@@ -1,0 +1,65 @@
+---
+title: Anti-patterns
+lede: The common ways DDD efforts go wrong, how to recognise each one, and what to do instead.
+---
+
+<h2 id="anemic">Anemic domain model</h2>
+<p><strong>Symptom:</strong> entities are bags of getters and setters, and all the logic lives in <code>XxxService</code> classes. Martin Fowler named this anti-pattern in 2003.</p>
+<div class="compare">
+  <div class="bad">
+    <h4>Anemic</h4>
+
+```java
+// HoldService.java
+if (hold.getStatus() == ACTIVE
+    && hold.getExpiresAt().isAfter(now)) {
+  hold.setStatus(CONVERTED);
+  hold.setPaymentRef(ref);
+}
+```
+  </div>
+  <div class="good">
+    <h4>Rich</h4>
+
+```java
+// HoldService.java
+hold.convertToOrder(ref, now);
+
+// Hold.java owns the rule, in one place
+```
+  </div>
+</div>
+<p><strong>Why it hurts:</strong> rules get duplicated across services, any code can put an object into an invalid state, and the model teaches you nothing about the business. <strong>Fix:</strong> move each rule onto the object whose data it uses, remove setters, and name methods after domain operations.</p>
+<div class="callout"><span class="label">But…</span>
+<p>An anemic model is fine for a simple CRUD supporting context. It only becomes an anti-pattern where real business rules exist.</p>
+</div>
+
+<h2 id="ddd-lite">DDD-lite (patterns without strategy)</h2>
+<p><strong>Symptom:</strong> folders named <code>entities/</code>, <code>valueobjects/</code> and <code>repositories/</code>, but no one has talked to a domain expert, there's no context map, and one giant model spans everything. <strong>Fix:</strong> start with the strategic work: language, subdomains, boundaries. The tactical patterns are the <em>least</em> important part of DDD.</p>
+
+<h2 id="god-aggregate">God aggregate</h2>
+<p><strong>Symptom:</strong> an <code>Event</code> aggregate containing seats, holds, orders, tickets, reviews and payouts, constant optimistic-locking failures, and slow loads. <strong>Fix:</strong> list the invariants that <em>truly</em> need immediate consistency and draw the aggregate around only those. Everything else becomes a separate aggregate that references by id and is coordinated by events. See <a href="aggregates.html">Aggregates</a>.</p>
+
+<h2 id="shared-model">One model to rule them all</h2>
+<p><strong>Symptom:</strong> a canonical <code>Customer</code> or <code>Ticket</code> class shared across the company, usually in a "common" library that everyone depends on and nobody can change. <strong>Fix:</strong> <a href="bounded-contexts.html">bounded contexts</a>. Let each context model what it needs, translate at the boundaries, and keep any shared kernel tiny.</p>
+
+<h2 id="shared-db">Integration through the database</h2>
+<p><strong>Symptom:</strong> context A reads or writes context B's tables directly. It's fast to build and then impossible to change, because B can't rename a column without breaking A. <strong>Fix:</strong> each context owns its data. Integrate through APIs or events. If A needs B's data locally, keep a replica updated from B's events.</p>
+
+<h2 id="leaky-events">Leaking internal events</h2>
+<p><strong>Symptom:</strong> internal domain events are serialised straight onto the company message bus, so every refactor of the model breaks consumers. <strong>Fix:</strong> translate to versioned <a href="domain-events.html#domain-vs-integration">integration events</a> at the boundary.</p>
+
+<h2 id="infra-in-domain">Infrastructure in the domain</h2>
+<p><strong>Symptom:</strong> aggregates call HTTP clients, read config, send emails, or use <code>Instant.now()</code>. Tests need containers and mocks for everything. <strong>Fix:</strong> the domain decides and records events. Application services and adapters do the I/O. Pass time in.</p>
+
+<h2 id="tech-language">Technical language in the model</h2>
+<p><strong>Symptom:</strong> <code>HoldManager</code>, <code>SeatProcessor</code>, <code>OrderDataHelper</code>, <code>updateStatus(int)</code>. <strong>Fix:</strong> rename to the ubiquitous language. If nobody can name the thing in business terms, the concept may be missing or wrong. Go back to the experts.</p>
+
+<h2 id="premature-microservices">Premature microservices</h2>
+<p><strong>Symptom:</strong> fifteen services on day one, with boundaries guessed before anyone understood the domain. Changes need coordinated deploys, which makes it a distributed monolith. <strong>Fix:</strong> start with a <strong>modular monolith</strong> that enforces context boundaries in code. Extract services once the boundaries have proven stable and there's a concrete reason to deploy separately (scaling, team autonomy, technology).</p>
+
+<h2 id="everything-core">Everything is core</h2>
+<p><strong>Symptom:</strong> the full tactical toolkit (aggregates, events, CQRS, hexagonal) applied to the venue-address form and the email templates. Delivery slows down everywhere. <strong>Fix:</strong> <a href="subdomains.html">classify subdomains</a> and match effort to value. Simple things should stay simple.</p>
+
+<h2 id="big-design-up-front">Big design up front</h2>
+<p><strong>Symptom:</strong> months of modelling before any code, then a model that resists every new requirement. <strong>Fix:</strong> model a little, code it, learn, and refactor. The model improves through use, and the code is where you find out whether it works.</p>

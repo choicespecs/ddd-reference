@@ -1,0 +1,46 @@
+---
+title: The running example
+lede: Fieldhouse is a fictional company that sells tickets for live events. Every chapter draws its examples from this one business so the ideas connect.
+---
+
+<h2 id="the-business">The business</h2>
+<p>Fieldhouse sells tickets for concerts, conferences and sports events on behalf of organisers. Its pitch to organisers is <strong>fair, fast on-sales</strong>: when 40,000 people try to buy 8,000 tickets at 10:00, the system holds seats briefly, prevents overselling, enforces per-customer limits to fight scalpers, and releases unpaid holds back to the pool.</p>
+<p>Here is how the people who run Fieldhouse describe their day:</p>
+<blockquote>"An organiser sets up an event at a venue and defines the price tiers. When the on-sale opens, a buyer picks seats and we put them on hold for ten minutes. If they pay in time, the hold becomes an order and we issue tickets. If not, the seats go back. At the door, staff scan tickets; each one admits once."</blockquote>
+
+<h2 id="contexts">Its bounded contexts</h2>
+<p>Each of these is introduced properly in <a href="subdomains.html">Subdomains</a> and <a href="bounded-contexts.html">Bounded contexts</a>. For now, just notice that each one is a different part of the business with its own concerns.</p>
+
+<table>
+  <thead><tr><th>Context</th><th>What it does</th><th>Subdomain type</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Event Planning</strong></td><td>Organisers create events, choose venues and seating plans, and set price tiers and on-sale dates</td><td>Supporting</td></tr>
+    <tr><td><strong>Sales</strong></td><td>Holds, carts, purchase limits, orders; the fairness rules that make on-sales work</td><td><strong>Core</strong></td></tr>
+    <tr><td><strong>Payments</strong></td><td>Charges and refunds through a payment provider</td><td>Generic</td></tr>
+    <tr><td><strong>Admission</strong></td><td>Issuing scannable tickets, and checking people in at the door</td><td>Supporting</td></tr>
+    <tr><td><strong>Notifications</strong></td><td>Emails and push messages to buyers</td><td>Generic</td></tr>
+  </tbody>
+</table>
+
+```mermaid
+flowchart LR
+  EP["Event Planning"] -- "EventPublished<br/>(seating plan, tiers)" --> S["Sales"]
+  S -- "charge / refund" --> P["Payments<br/>(wraps provider)"]
+  P -- "PaymentCaptured" --> S
+  S -- "OrderConfirmed" --> A["Admission"]
+  S -- "OrderConfirmed" --> N["Notifications"]
+  A -- "TicketsIssued" --> N
+```
+
+<h2 id="why-this-example">Why this example works for learning</h2>
+<ul>
+  <li><strong>Real invariants.</strong> A seat can't be sold twice. A buyer can't exceed the limit of six tickets per event. These rules force careful <a href="aggregates.html">aggregate design</a>.</li>
+  <li><strong>Time matters.</strong> Holds expire and on-sales open at a set time. That shows why domain events and an injectable clock are useful.</li>
+  <li><strong>One word, several meanings.</strong> A "ticket" is a priced line item to Sales and a scannable barcode that admits once to Admission. This is the classic case for <a href="bounded-contexts.html">bounded contexts</a>.</li>
+  <li><strong>Generic pieces you shouldn't build.</strong> Payments and email are solved problems. Recognising that is part of <a href="subdomains.html">strategic design</a>.</li>
+  <li><strong>Scale pressure.</strong> On-sale spikes push you to think about aggregate size, contention and eventual consistency.</li>
+</ul>
+
+<div class="callout"><span class="label">About the code</span>
+<p>Examples use modern Java (records, sealed interfaces) because it is explicit and widely read. Nothing is framework-specific. Each snippet is a sketch that shows one idea, so imports, getters and error handling are trimmed. The same designs translate directly to C#, Kotlin, TypeScript, Python or Go.</p>
+</div>

@@ -1,75 +1,74 @@
 ---
 title: Glossary
-lede: DDD and architecture terms used in this guide, plus the shop's own ubiquitous language. Copy this page and replace the second half with your domain's terms.
+lede: Every DDD term used in this guide, with a short definition and a link to where it's explained.
 ---
 
-<h2 id="ddd-terms">DDD &amp; architecture terms</h2>
-<table>
-  <thead><tr><th>Term</th><th>Meaning</th><th>See</th></tr></thead>
-  <tbody>
-    <tr><td><strong>Aggregate</strong></td><td>A cluster of entities and value objects treated as one unit for data changes, with one root entity that enforces its invariants.</td><td><a href="tactical-patterns.html#aggregates">Tactical</a></td></tr>
-    <tr><td><strong>Aggregate root</strong></td><td>The single entity through which an aggregate is accessed and modified.</td><td><a href="tactical-patterns.html#aggregates">Tactical</a></td></tr>
-    <tr><td><strong>Anemic domain model</strong></td><td>Classes with data but no behaviour; the rules live in services. An anti-pattern when the domain is complex.</td><td><a href="ddd-fundamentals.html#model">Fundamentals</a></td></tr>
-    <tr><td><strong>Anti-corruption layer (ACL)</strong></td><td>A translation layer that protects one context's model from another's.</td><td><a href="strategic-design.html#acl-example">Strategic</a></td></tr>
-    <tr><td><strong>Application service</strong></td><td>Orchestrates a use case: transaction, load, call domain, save, publish. No business rules.</td><td><a href="application-layer.html">Application layer</a></td></tr>
-    <tr><td><strong>Bounded context</strong></td><td>A boundary within which a model and its language are consistent and unambiguous.</td><td><a href="strategic-design.html#bounded-contexts">Strategic</a></td></tr>
-    <tr><td><strong>Command</strong></td><td>An immutable request to change state, named in the imperative (<code>PlaceOrder</code>).</td><td><a href="application-layer.html#commands">Application layer</a></td></tr>
-    <tr><td><strong>Context map</strong></td><td>A diagram of bounded contexts and the relationships between them.</td><td><a href="strategic-design.html#context-mapping">Strategic</a></td></tr>
-    <tr><td><strong>Core / supporting / generic subdomain</strong></td><td>A classification of business areas by differentiation and complexity.</td><td><a href="strategic-design.html#subdomains">Strategic</a></td></tr>
-    <tr><td><strong>CQRS</strong></td><td>Command Query Responsibility Segregation: separate models for writes and reads.</td><td><a href="architecture-styles.html#cqrs">Architecture</a></td></tr>
-    <tr><td><strong>Dirty checking</strong></td><td>Hibernate compares managed entities to their loaded snapshot and issues UPDATEs at flush or commit.</td><td><a href="persistence.html#dirty-checking">Persistence</a></td></tr>
-    <tr><td><strong>Domain event</strong></td><td>An immutable record of something that happened in the domain, named in the past tense.</td><td><a href="domain-events.html">Events</a></td></tr>
-    <tr><td><strong>Domain service</strong></td><td>Stateless domain logic that doesn't fit one entity.</td><td><a href="tactical-patterns.html#domain-services">Tactical</a></td></tr>
-    <tr><td><strong>Entity</strong></td><td>An object defined by a continuous identity rather than its attributes.</td><td><a href="tactical-patterns.html#entities">Tactical</a></td></tr>
-    <tr><td><strong>Event Storming</strong></td><td>A collaborative workshop technique for exploring a domain with sticky notes.</td><td><a href="strategic-design.html#event-storming">Strategic</a></td></tr>
-    <tr><td><strong>Eventual consistency</strong></td><td>Different parts of the system become consistent after a delay, instead of atomically.</td><td><a href="domain-events.html#eventual-consistency">Events</a></td></tr>
-    <tr><td><strong>Factory</strong></td><td>Encapsulates the creation of complex objects or aggregates.</td><td><a href="tactical-patterns.html#factories">Tactical</a></td></tr>
-    <tr><td><strong>Hexagonal architecture</strong></td><td>Ports &amp; adapters: the core defines interfaces, and the outside world plugs in.</td><td><a href="architecture-styles.html#hexagonal">Architecture</a></td></tr>
-    <tr><td><strong>Integration event</strong></td><td>A stable, primitive-typed event shared between bounded contexts or services.</td><td><a href="domain-events.html#two-kinds">Events</a></td></tr>
-    <tr><td><strong>Invariant</strong></td><td>A business rule that must always be true for an aggregate.</td><td><a href="tactical-patterns.html#aggregate-rules">Tactical</a></td></tr>
-    <tr><td><strong>Modular monolith</strong></td><td>One deployable made of modules with enforced boundaries.</td><td><a href="architecture-styles.html#monolith-vs-microservices">Architecture</a></td></tr>
-    <tr><td><strong>Optimistic locking</strong></td><td>Detects concurrent updates through a version column instead of holding locks.</td><td><a href="persistence.html#optimistic-locking">Persistence</a></td></tr>
-    <tr><td><strong>Outbox</strong></td><td>Store outgoing events in the same transaction as the state change, and relay them later.</td><td><a href="domain-events.html#outbox">Events</a></td></tr>
-    <tr><td><strong>Port / adapter</strong></td><td>A port is an interface owned by the core; an adapter is a technology-specific implementation.</td><td><a href="architecture-styles.html#hexagonal">Architecture</a></td></tr>
-    <tr><td><strong>Problem details (problem+json)</strong></td><td>RFC 7807/9457 standard JSON format for HTTP API errors. Produced here by <code>ApiProblem</code>; Spring 6 calls its built-in version <code>ProblemDetail</code>.</td><td><a href="rest-api.html#errors">REST API</a></td></tr>
-    <tr><td><strong>Published language</strong></td><td>A documented shared format for inter-context communication.</td><td><a href="strategic-design.html#context-mapping">Strategic</a></td></tr>
-    <tr><td><strong>Read model / view</strong></td><td>A data structure shaped for a query or screen, with no behaviour.</td><td><a href="application-layer.html#read-models">Application layer</a></td></tr>
-    <tr><td><strong>Repository</strong></td><td>Collection-like access to aggregates that hides persistence.</td><td><a href="tactical-patterns.html#repositories">Tactical</a></td></tr>
-    <tr><td><strong>Saga / process manager</strong></td><td>Coordinates a multi-step process across aggregates or services with compensating actions.</td><td><a href="domain-events.html#eventual-consistency">Events</a></td></tr>
-    <tr><td><strong>Shared kernel</strong></td><td>A small model subset shared by contexts and changed only by agreement.</td><td><a href="strategic-design.html#context-mapping">Strategic</a></td></tr>
-    <tr><td><strong>Ubiquitous language</strong></td><td>The shared vocabulary of the team and the domain experts, reflected in the code.</td><td><a href="ddd-fundamentals.html#ubiquitous-language">Fundamentals</a></td></tr>
-    <tr><td><strong>Value object</strong></td><td>An immutable object defined by its attributes, with no identity.</td><td><a href="tactical-patterns.html#value-objects">Tactical</a></td></tr>
-  </tbody>
-</table>
+<h2 id="a-c">A – C</h2>
+<dl class="def">
+  <dt>Aggregate</dt><dd>A cluster of entities and value objects treated as one unit for data changes, with a single root and a consistency boundary. <a href="aggregates.html">→</a></dd>
+  <dt>Aggregate root</dt><dd>The one entity in an aggregate that outside code may reference and call; it enforces the aggregate's invariants.</dd>
+  <dt>Anemic domain model</dt><dd>An anti-pattern where domain objects hold data but no behaviour, with the logic in services. <a href="anti-patterns.html#anemic">→</a></dd>
+  <dt>Anti-corruption layer (ACL)</dt><dd>A translation layer that protects a context's model from an upstream model. <a href="context-mapping.html#acl">→</a></dd>
+  <dt>Application service</dt><dd>Coordinates a use case: loads aggregates, calls domain methods, saves, publishes events. No business rules. <a href="services.html#application-services">→</a></dd>
+  <dt>Big ball of mud</dt><dd>A system without discernible boundaries, where models are tangled together. <a href="context-mapping.html#big-ball-of-mud">→</a></dd>
+  <dt>Bounded context</dt><dd>An explicit boundary inside which one model and one meaning for each term applies. <a href="bounded-contexts.html">→</a></dd>
+  <dt>Bubble context</dt><dd>A small, clean new context inside a legacy landscape, protected by an ACL. <a href="legacy.html#bubble-context">→</a></dd>
+  <dt>Command</dt><dd>A request to change state, named in the imperative (<code>PlaceHold</code>); it may be rejected.</dd>
+  <dt>Conformist</dt><dd>A downstream context that adopts the upstream model without translation. <a href="context-mapping.html#conformist">→</a></dd>
+  <dt>Context map</dt><dd>A diagram and description of the relationships between bounded contexts and their teams. <a href="context-mapping.html">→</a></dd>
+  <dt>Core domain / subdomain</dt><dd>The part of the business that provides competitive advantage, where modelling effort pays off most. <a href="subdomains.html">→</a></dd>
+  <dt>CQRS</dt><dd>Command Query Responsibility Segregation: separate models for writing and reading. <a href="cqrs-event-sourcing.html#cqrs">→</a></dd>
+  <dt>Customer–supplier</dt><dd>An upstream/downstream relationship where the upstream team plans around the downstream team's needs. <a href="context-mapping.html#customer-supplier">→</a></dd>
+</dl>
 
-<h2 id="shop-language">The shop's ubiquitous language</h2>
-<p>This is what a project glossary looks like. Replace it with your own domain's terms.</p>
+<h2 id="d-g">D – G</h2>
+<dl class="def">
+  <dt>Distillation</dt><dd>Separating the core domain from supporting and generic concerns so it stays small and clear. <a href="subdomains.html#distillation">→</a></dd>
+  <dt>Domain</dt><dd>The area of knowledge or activity the software serves, such as live-event ticketing.</dd>
+  <dt>Domain event</dt><dd>An immutable record of a business-significant fact, named in the past tense. <a href="domain-events.html">→</a></dd>
+  <dt>Domain expert</dt><dd>Someone with deep knowledge of the business: organisers, box-office staff, finance, operations.</dd>
+  <dt>Domain model</dt><dd>The system of abstractions (expressed in language and code) that captures the parts of the domain relevant to the problem.</dd>
+  <dt>Domain service</dt><dd>A stateless operation that expresses domain logic not belonging to any single entity or value object. <a href="services.html#domain-services">→</a></dd>
+  <dt>Domain Storytelling</dt><dd>A workshop technique where experts tell concrete stories that are drawn as pictographic sentences. <a href="discovery.html#domain-storytelling">→</a></dd>
+  <dt>Entity</dt><dd>An object defined by a lasting identity rather than its attributes. <a href="entities-value-objects.html#entities">→</a></dd>
+  <dt>Event sourcing</dt><dd>Persisting an aggregate as its sequence of events rather than its current state. <a href="cqrs-event-sourcing.html#event-sourcing">→</a></dd>
+  <dt>Event Storming</dt><dd>A collaborative workshop that models a domain as a timeline of domain events on sticky notes. <a href="discovery.html#event-storming">→</a></dd>
+  <dt>Eventual consistency</dt><dd>Data across boundaries becomes consistent after a short delay rather than instantly. <a href="integrating-contexts.html#eventual-consistency">→</a></dd>
+  <dt>Example Mapping</dt><dd>A technique that breaks a story into rules, concrete examples and open questions. <a href="discovery.html#example-mapping">→</a></dd>
+  <dt>Factory</dt><dd>Something that encapsulates creating a valid aggregate or complex value. <a href="repositories-factories.html#factories">→</a></dd>
+  <dt>Generic subdomain</dt><dd>A solved problem common to many businesses (payments, email, identity); usually bought rather than built.</dd>
+</dl>
 
-<h3 id="catalog-terms">Catalog context</h3>
-<table>
-  <thead><tr><th>Term</th><th>Meaning</th><th>Code</th></tr></thead>
-  <tbody>
-    <tr><td>Product</td><td>Something we sell, identified by a SKU</td><td><code>catalog.domain.Product</code></td></tr>
-    <tr><td>SKU</td><td>Stock-keeping unit; format <code>LETTERS-DIGITS</code>, e.g. BOOK-0001</td><td><code>Sku</code></td></tr>
-    <tr><td>Stock on hand</td><td>Units physically available and not reserved. Never negative.</td><td><code>Product.getStockOnHand()</code></td></tr>
-    <tr><td>Receive stock</td><td>Goods arrive from a supplier; stock increases</td><td><code>Product.receiveStock()</code></td></tr>
-    <tr><td>Reserve</td><td>Set aside stock for a placed order</td><td><code>Product.reserve()</code></td></tr>
-    <tr><td>Release</td><td>Return reserved stock after a cancellation</td><td><code>Product.release()</code></td></tr>
-    <tr><td>Active</td><td>Available for sale; inactive products can't be reserved</td><td><code>Product.isActive()</code></td></tr>
-  </tbody>
-</table>
+<h2 id="i-p">I – P</h2>
+<dl class="def">
+  <dt>Idempotency</dt><dd>Handling the same message more than once has the same effect as handling it once. <a href="integrating-contexts.html#idempotency">→</a></dd>
+  <dt>Integration event</dt><dd>A versioned, public event meant for other bounded contexts, as opposed to an internal domain event. <a href="domain-events.html#domain-vs-integration">→</a></dd>
+  <dt>Invariant</dt><dd>A business rule that must always hold true for an aggregate when it's saved.</dd>
+  <dt>Modular monolith</dt><dd>One deployable whose code is split into modules with enforced boundaries, often one per bounded context.</dd>
+  <dt>Module</dt><dd>A grouping of model elements by domain concept (e.g. <code>hold/</code>), named in the ubiquitous language.</dd>
+  <dt>Open host service (OHS)</dt><dd>A well-defined protocol that an upstream context offers to all consumers. <a href="context-mapping.html#ohs">→</a></dd>
+  <dt>Outbox (transactional)</dt><dd>Writing events to a table in the same transaction as the state change, then relaying them to a broker. <a href="integrating-contexts.html#outbox">→</a></dd>
+  <dt>Partnership</dt><dd>Two teams that coordinate closely and evolve their interface together. <a href="context-mapping.html#partnership">→</a></dd>
+  <dt>Policy</dt><dd>A reactive business rule: "whenever X happens, do Y". Shown as lilac stickies in Event Storming.</dd>
+  <dt>Port / adapter</dt><dd>An interface owned by the core (port) and a technology-specific implementation (adapter). <a href="architecture.html#hexagonal">→</a></dd>
+  <dt>Process manager</dt><dd>A stateful coordinator for a long-running process across aggregates or contexts. <a href="integrating-contexts.html#sagas">→</a></dd>
+  <dt>Projection / read model</dt><dd>A query-optimised view built from events or state, used on the read side of CQRS.</dd>
+  <dt>Published language (PL)</dt><dd>A documented, shared schema used for integration between contexts. <a href="context-mapping.html#ohs">→</a></dd>
+</dl>
 
-<h3 id="ordering-terms">Ordering context</h3>
-<table>
-  <thead><tr><th>Term</th><th>Meaning</th><th>Code</th></tr></thead>
-  <tbody>
-    <tr><td>Order</td><td>A customer's request to buy products</td><td><code>ordering.domain.Order</code></td></tr>
-    <tr><td>Draft</td><td>An order still being assembled; lines can change</td><td><code>OrderStatus.DRAFT</code></td></tr>
-    <tr><td>Order line</td><td>One product on an order, with quantity and the price <em>at the time it was added</em></td><td><code>OrderLine</code></td></tr>
-    <tr><td>Place</td><td>The customer commits to the order; stock is reserved; lines are frozen</td><td><code>Order.place()</code></td></tr>
-    <tr><td>Ship</td><td>The order leaves the warehouse; it can no longer be cancelled</td><td><code>Order.ship()</code></td></tr>
-    <tr><td>Cancel</td><td>Abandon a draft or placed order; placed orders release their stock</td><td><code>Order.cancel()</code></td></tr>
-    <tr><td>Total</td><td>Sum of line totals in the order's single currency; always computed, never stored</td><td><code>Order.total()</code></td></tr>
-    <tr><td>Orderable product</td><td>Ordering's view of a catalog product: name, price, and whether it can be ordered now</td><td><code>ProductCatalog.OrderableProduct</code></td></tr>
-  </tbody>
-</table>
+<h2 id="r-z">R – Z</h2>
+<dl class="def">
+  <dt>Reconstitution</dt><dd>Rebuilding an existing aggregate from storage, without re-running creation rules or raising events.</dd>
+  <dt>Repository</dt><dd>A collection-like abstraction for retrieving and storing aggregates. <a href="repositories-factories.html#repositories">→</a></dd>
+  <dt>Saga</dt><dd>A long-running business transaction made of local steps with compensations; often implemented by a process manager or by choreography.</dd>
+  <dt>Separate ways</dt><dd>Choosing not to integrate two contexts at all. <a href="context-mapping.html#separate-ways">→</a></dd>
+  <dt>Shared kernel</dt><dd>A small part of the model explicitly shared by two contexts and changed only by agreement. <a href="context-mapping.html#shared-kernel">→</a></dd>
+  <dt>Strangler fig</dt><dd>Gradually replacing a legacy system by routing capabilities to new code one at a time. <a href="legacy.html#strangler-fig">→</a></dd>
+  <dt>Strategic design</dt><dd>The part of DDD concerned with subdomains, bounded contexts and their relationships.</dd>
+  <dt>Subdomain</dt><dd>A coherent part of the business problem: core, supporting or generic. <a href="subdomains.html">→</a></dd>
+  <dt>Supporting subdomain</dt><dd>A business-specific area that's necessary but not a differentiator.</dd>
+  <dt>Tactical design</dt><dd>The building-block patterns used to implement a model inside one bounded context.</dd>
+  <dt>Ubiquitous language</dt><dd>The shared, rigorous language of a bounded context, used by experts and developers in conversation and code. <a href="ubiquitous-language.html">→</a></dd>
+  <dt>Upstream / downstream</dt><dd>The direction of influence between two contexts; downstream depends on upstream. <a href="context-mapping.html#upstream-downstream">→</a></dd>
+  <dt>Value object</dt><dd>An immutable object defined only by its attributes, with no identity. <a href="entities-value-objects.html#value-objects">→</a></dd>
+</dl>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A bounded context is an explicit boundary inside which one model, and one meaning for every term, applies consistently. It is the central pattern of strategic DDD.">
+<title>Bounded contexts — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html" aria-current="page" class="on">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Strategic design</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Strategic design</span>
+          <h1>Bounded contexts</h1>
+          <p class="lede">A bounded context is an explicit boundary inside which one model, and one meaning for every term, applies consistently. It is the central pattern of strategic DDD.</p>
+        </header>
+        <h2 id="the-one-model-trap">The "one model" trap</h2>
+<p>The natural instinct is to build a single, unified model of the business, with one <code>Ticket</code> class and one <code>Customer</code> table that every part of the system shares. For any non-trivial business this fails. Different parts of the business genuinely need different models of the "same" thing:</p>
+
+<table>
+  <thead><tr><th>Context</th><th>What "ticket" means</th><th>What it needs</th></tr></thead>
+  <tbody>
+    <tr><td>Sales</td><td>A line on an order</td><td>seat, price tier, price paid, order id</td></tr>
+    <tr><td>Admission</td><td>A pass that admits one person once</td><td>barcode, gate, scanned-at, revoked flag</td></tr>
+    <tr><td>Event Planning</td><td>A unit of venue capacity</td><td>section, row, accessibility, sellable flag</td></tr>
+    <tr><td>Finance</td><td>A revenue item</td><td>gross, fees, tax, payout batch</td></tr>
+  </tbody>
+</table>
+
+<p>Merge all of those into one <code>Ticket</code> and you get a class with 40 nullable fields where every change risks breaking a department you've never met. Each team then has to understand everyone else's concerns to change anything. That is the <strong>big ball of mud</strong>.</p>
+
+<h2 id="definition">Definition</h2>
+<dl class="def">
+  <dt>Bounded context</dt>
+  <dd>An explicit boundary (linguistic, and usually also in code, data and team ownership) within which a particular domain model is defined and applicable. Inside it, every term has exactly one meaning. Outside it, the same word may mean something else, and that's fine.</dd>
+</dl>
+
+<pre class="mermaid">
+flowchart LR
+  subgraph Sales["Sales context"]
+    T1["Ticket&lt;br/&gt;seat · tier · price"]
+    O["Order"] --&gt; T1
+  end
+  subgraph Admission["Admission context"]
+    T2["Ticket&lt;br/&gt;barcode · scannedAt"]
+    G["Gate"] --&gt; T2
+  end
+  Sales -- "OrderConfirmed&lt;br/&gt;(orderId, seatIds)" --&gt; Admission
+</pre>
+
+<p>The two <code>Ticket</code> classes share a name, but they are different concepts and different code. They're connected only by an explicit translation, here an event carrying identifiers.</p>
+
+<h2 id="what-a-boundary-contains">What a boundary usually contains</h2>
+<ul>
+  <li><strong>A model and its language</strong>: the defining feature.</li>
+  <li><strong>Code</strong>: a module, package, or service. Code from other contexts doesn't reach into its internals.</li>
+  <li><strong>Data</strong>: its own schema or tables. Other contexts don't query them directly.</li>
+  <li><strong>A team</strong>: ideally one team owns a context end to end. One team may own several contexts, but a context shared by several teams tends to rot.</li>
+</ul>
+
+<h2 id="sizing">How big should a context be?</h2>
+<p>There's no formula. Some heuristics:</p>
+<ul>
+  <li><strong>Language heuristic</strong>: if a term starts needing a qualifier ("the sales ticket" vs. "the door ticket"), you're probably crossing a boundary.</li>
+  <li><strong>Team heuristic</strong>: a context should be small enough for one team to own and understand completely.</li>
+  <li><strong>Change heuristic</strong>: things that change together for the same business reason belong together.</li>
+  <li><strong>Autonomy heuristic</strong>: a good boundary lets a team ship most changes without coordinating with other teams.</li>
+  <li><strong>Start larger</strong>. Splitting a context later is easier than merging two that grew apart. Early on you know the least about where the real seams are.</li>
+</ul>
+
+<h2 id="contexts-and-services">Bounded contexts and microservices</h2>
+<p>A bounded context is a <em>model</em> boundary. A microservice is a <em>deployment</em> boundary. They fit together well, but:</p>
+<ul>
+  <li>One context can be deployed as several services (for example, Sales' on-sale API scaled separately from its back-office API).</li>
+  <li>Several contexts can live in one deployable as <strong>modules of a monolith</strong>, often called a <em>modular monolith</em>. This is often the best place to start: boundaries are enforced by module rules, and you can pull a context out into its own service later if scaling or team autonomy calls for it.</li>
+  <li>A service that spans several contexts is usually a smell: it mixes models.</li>
+</ul>
+
+<h2 id="in-code">What it looks like in code</h2>
+<p>In a modular monolith, each context gets a top-level module with a small public API. Its internals are hidden.</p>
+<div class="tree">fieldhouse/
+├── sales/                     ← bounded context (core)
+│   ├── api/                   ← the only package other contexts may use
+│   │   ├── SalesFacade.java
+│   │   └── events/OrderConfirmed.java
+│   ├── domain/                ← Hold, Order, EventSeating, PurchaseLimit …
+│   ├── application/
+│   └── infrastructure/
+├── admission/                 ← bounded context
+│   ├── domain/                ← its own Ticket, Gate, Scan …
+│   └── …
+├── planning/
+└── shared/                    ← tiny shared kernel (if any): Money, EventId</div>
+<p>Enforce the rule with a module system (Java's JPMS, Gradle/Maven modules, .NET assemblies), a build-time architecture test (ArchUnit, NetArchTest, dependency-cruiser), or with tools like Spring Modulith.</p>
+
+<div class="callout warn"><span class="label">Watch for</span>
+<p>A context that's split in the code but shares a database schema with another context isn't really bounded. Shared tables are a shared model, and changing a column couples the two teams again.</p>
+</div>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="discovery.html"><small>← Previous</small>Discovering the domain</a><a class="next" href="context-mapping.html"><small>Next →</small>Context mapping</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/bounded-contexts.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

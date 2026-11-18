@@ -1,0 +1,67 @@
+---
+title: Ubiquitous language
+lede: A single, precise vocabulary that domain experts and developers share. You use it in conversation, in documents, and in the code itself.
+---
+
+<h2 id="definition">Definition</h2>
+<dl class="def">
+  <dt>Ubiquitous language</dt>
+  <dd>The language the team builds around the domain model, used by everyone on the team in every activity. "Ubiquitous" means everywhere: whiteboards, tickets, tests, class names, method names, database tables and API fields.</dd>
+</dl>
+<p>Without one, every conversation goes through a translation step. An expert says "release the hold", a developer hears "set <code>status = 3</code>", and somewhere in that translation a rule gets lost. With one, the expert could read the method name <code>hold.release()</code> and nod.</p>
+
+<h2 id="from-talk-to-code">From conversation to code</h2>
+<p>Listen for the <strong>nouns</strong> (candidate entities and value objects), the <strong>verbs</strong> (commands and behaviour), the <strong>past-tense phrases</strong> (domain events) and the <strong>rules</strong> (invariants and policies).</p>
+<blockquote>"When a buyer <u>places a hold</u> on seats, those seats are <u>unavailable</u> to anyone else until the hold <u>expires</u> or is <u>converted into an order</u>. A buyer can't hold more than the event's <u>purchase limit</u>."</blockquote>
+
+<div class="compare">
+  <div class="bad">
+    <h4>Translated (lossy)</h4>
+
+```java
+seatService.updateStatus(seatIds, 2, userId);
+if (count(userId) > cfg.getMax()) throw new Ex("too many");
+reservationRepo.save(new Reservation(userId, seatIds, now + 600_000));
+```
+  </div>
+  <div class="good">
+    <h4>Ubiquitous</h4>
+
+```java
+Hold hold = event.placeHold(buyer, seats, clock);
+// throws PurchaseLimitExceeded
+...
+hold.convertToOrder(payment);
+hold.expire();
+```
+  </div>
+</div>
+
+<h2 id="building-it">Building the language</h2>
+<ul>
+  <li><strong>Work from concrete scenarios, not abstractions.</strong> "Walk me through what happens when someone's card is declined during an on-sale" gets better language than "describe your entities."</li>
+  <li><strong>Push back on vague words.</strong> When someone says "process", "handle", "manage" or "data", ask what <em>actually</em> happens.</li>
+  <li><strong>Resolve synonyms.</strong> If "reservation", "hold" and "block" mean the same thing, agree on one and retire the others. If they mean <em>different</em> things, you've just found a concept.</li>
+  <li><strong>Notice homonyms.</strong> If "ticket" means two different things to two groups, that's usually a <a href="bounded-contexts.html">context boundary</a>, not a naming problem.</li>
+  <li><strong>Write a glossary per context</strong>, keep it short, and put it next to the code (a <code>GLOSSARY.md</code> in the module). Prune it actively.</li>
+  <li><strong>Rename code when the language changes.</strong> A stale name in code makes the old misunderstanding permanent. IDE refactorings make renaming cheap, so do it.</li>
+</ul>
+
+<h2 id="fieldhouse-glossary">Example: Sales context glossary</h2>
+<table>
+  <thead><tr><th>Term</th><th>Meaning in Sales</th><th>Not to be confused with</th></tr></thead>
+  <tbody>
+    <tr><td>On-sale</td><td>The moment from which an event's tickets may be held and bought</td><td>"Sale" as a discount</td></tr>
+    <tr><td>Hold</td><td>A time-limited claim by one buyer on specific seats; expires after 10 minutes</td><td>An order (a hold has no payment yet)</td></tr>
+    <tr><td>Purchase limit</td><td>Max seats one buyer may hold or own for an event, across all orders</td><td>Venue capacity</td></tr>
+    <tr><td>Order</td><td>A paid, confirmed purchase created from exactly one hold</td><td>A cart (not a Sales concept at all)</td></tr>
+    <tr><td>Ticket</td><td>A line on an order: one seat at one price tier</td><td>Admission's "ticket", a scannable pass</td></tr>
+  </tbody>
+</table>
+
+<h2 id="pitfalls">Pitfalls</h2>
+<ul>
+  <li><strong>Developer jargon leaking in</strong>: <code>SeatDTO</code>, <code>HoldManager</code>, <code>processReservationData()</code>. Technical names belong in the infrastructure layer, not in the domain model.</li>
+  <li><strong>Forcing one language on the whole company</strong>: the language is ubiquitous <em>within a bounded context</em>, not across the organisation. Marketing and Admission are allowed to mean different things by "ticket".</li>
+  <li><strong>Treating it as documentation</strong>: the language lives in conversations and code. A glossary that nobody updates is a museum.</li>
+</ul>

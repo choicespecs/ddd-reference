@@ -1,0 +1,122 @@
+---
+title: Aggregates
+lede: An aggregate is a cluster of objects treated as one unit for changes. It is the boundary inside which business rules must always hold. Sizing aggregates well is the hardest and most important tactical decision.
+---
+
+<h2 id="definition">Definition</h2>
+<dl class="def">
+  <dt>Aggregate</dt>
+  <dd>A cluster of entities and value objects with a defined boundary and a single entry point, the <strong>aggregate root</strong>. Outside objects may hold references only to the root. All changes go through the root, which guarantees the aggregate's invariants after every operation.</dd>
+  <dt>Invariant</dt>
+  <dd>A business rule that must be true whenever the aggregate is saved. Example: "no seat in an event is held or sold to more than one buyer."</dd>
+</dl>
+
+```mermaid
+flowchart TB
+  subgraph AGG["EventSeating aggregate (consistency boundary)"]
+    R["EventSeating «root»<br/>eventId · onSaleAt"]
+    S1["SeatAllocation «entity»<br/>12F · HELD by hold-7"]
+    S2["SeatAllocation «entity»<br/>12G · AVAILABLE"]
+    T["PriceTier «value»"]
+    R --> S1 & S2
+    S1 --> T
+  end
+  H["Hold «separate aggregate»"] -. "references EventId only" .-> R
+  X["Outside code"] -- "✓ calls root" --> R
+  X -. "✗ never touches" .-> S1
+```
+
+<h2 id="vernon-rules">The four rules of aggregate design</h2>
+<p>Vaughn Vernon's rules from <em>Implementing Domain-Driven Design</em> are the best starting point:</p>
+
+<h3 id="rule-1">1. Model true invariants in consistency boundaries</h3>
+<p>Put objects in the same aggregate <strong>only</strong> if a business rule requires them to be consistent <em>at the same instant</em>. "A seat can't be held twice" requires every seat allocation for an event to be checked together, so they belong in one aggregate. "An order's total should appear on the buyer's dashboard" doesn't need instant consistency. A few seconds of delay is fine.</p>
+
+<h3 id="rule-2">2. Design small aggregates</h3>
+<p>Large aggregates load slowly, lock widely, and cause concurrency conflicts. If <code>Event</code> contained seats, holds, orders and reviews, every buyer during an on-sale would fight over the same row. Aim for a root plus a few values, and add more only when an invariant demands it.</p>
+
+<h3 id="rule-3">3. Reference other aggregates by identity</h3>
+<p>Hold an <code>EventId</code>, not an <code>Event</code> object. This keeps boundaries clear, avoids accidentally loading and modifying huge graphs, and makes it possible to put aggregates in different databases or services later.</p>
+
+```java
+public class Hold {
+    private final HoldId id;
+    private final EventId event;      // ✓ id reference
+    private final BuyerId buyer;      // ✓ id reference
+    // private Event event;           // ✗ object reference across aggregates
+}
+```
+
+<h3 id="rule-4">4. Use eventual consistency outside the boundary</h3>
+<p>Change <strong>one aggregate per transaction</strong>. When something else needs to react, such as releasing seats after a hold expires or issuing tickets after an order confirms, publish a <a href="domain-events.html">domain event</a> and handle it in a separate transaction.</p>
+
+<div class="callout"><span class="label">Ask the experts</span>
+<p>Whether a rule really needs immediate consistency is a <em>business</em> question. Ask "what would happen if this were true a few seconds later?" Experts often reveal the business has always tolerated delays, for example reconciling at the end of the day.</p>
+</div>
+
+<h2 id="example">Worked example: on-sale seating</h2>
+<p>The invariant "no seat is held or sold twice" spans every seat in the event, so <code>EventSeating</code> is the aggregate. A <code>Hold</code> is a <em>separate</em> aggregate with its own lifecycle (pay, expire, cancel). They coordinate through events.</p>
+
+```java
+public class EventSeating {                                   // aggregate root
+    private final EventId id;
+    private final Instant onSaleAt;
+    private final Map<SeatId, SeatAllocation> seats;
+    private final List<DomainEvent> events = new ArrayList<>();
+    private long version;                                     // optimistic locking
+
+    public HoldId hold(BuyerId buyer, SeatSelection selection, Instant now) {
+        if (now.isBefore(onSaleAt)) throw new OnSaleNotOpen(id, onSaleAt);
+        for (SeatId seat : selection.seats()) {
+            SeatAllocation a = seats.get(seat);
+            if (a == null)          throw new UnknownSeat(seat);
+            if (!a.isAvailable())   throw new SeatUnavailable(seat);
+        }
+        HoldId hold = HoldId.newId();
+        selection.seats().forEach(s -> seats.get(s).holdFor(hold));
+        events.add(new SeatsHeld(id, hold, buyer, selection, now));
+        return hold;
+    }
+
+    public void release(HoldId hold) {
+        seats.values().stream().filter(a -> a.isHeldBy(hold)).forEach(SeatAllocation::release);
+        events.add(new SeatsReleased(id, hold));
+    }
+
+    public void markSold(HoldId hold) {
+        seats.values().stream().filter(a -> a.isHeldBy(hold)).forEach(SeatAllocation::sell);
+    }
+}
+```
+
+<h2 id="sizing-tradeoffs">Sizing trade-offs</h2>
+<table>
+  <thead><tr><th>Too large</th><th>Too small</th></tr></thead>
+  <tbody>
+    <tr><td>Contention: concurrent users get optimistic-lock failures</td><td>Invariants can't be enforced, so you get race conditions across aggregates</td></tr>
+    <tr><td>Slow loads; memory pressure</td><td>Many cross-aggregate transactions (a sign the boundary is wrong)</td></tr>
+    <tr><td>Hard to understand and test</td><td>Business logic leaks into application services to coordinate</td></tr>
+  </tbody>
+</table>
+
+<div class="callout warn"><span class="label">Scaling the Fieldhouse example</span>
+<p>A stadium with 60,000 seats as a single <code>EventSeating</code> aggregate would bottleneck during an on-sale. The domain gives a way out: <strong>seats in different sections never conflict</strong>. Partition the aggregate as <code>SectionSeating(eventId, sectionId)</code>, which still enforces "no seat twice" but spreads contention across many sections. The purchase limit spans sections, so it has to be enforced differently. Options include a small per-buyer <code>BuyerAllowance</code> aggregate updated first, or checking eventually and cancelling holds that go over the limit. Neither choice is purely technical; both are business trade-offs.</p>
+</div>
+
+<h2 id="concurrency">Concurrency</h2>
+<p>An aggregate is also the unit of locking. Two common strategies:</p>
+<ul>
+  <li><strong>Optimistic locking</strong> (default): store a version number. A save fails if someone else saved first, and the caller retries or reports a conflict. This works well when conflicts are rare.</li>
+  <li><strong>Pessimistic locking</strong>: lock the row on load. Use it sparingly for very hot, short operations.</li>
+</ul>
+<p>Frequent version conflicts are a design signal. Either the aggregate is too big or two unrelated use cases are sharing it.</p>
+
+<h2 id="checklist">Aggregate design checklist</h2>
+<ul>
+  <li>Can you name the invariant(s) this boundary protects?</li>
+  <li>Does every change go through a method on the root?</li>
+  <li>Are references to other aggregates by id only?</li>
+  <li>Does each use case modify exactly one aggregate instance?</li>
+  <li>Is it small enough to load, lock and test cheaply?</li>
+  <li>Are its internals (child entities) hidden from outside code?</li>
+</ul>

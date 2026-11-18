@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The books, articles and community resources worth your time, roughly in the order you might read them.">
+<title>Further reading — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html" aria-current="page" class="on">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Reference</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Reference</span>
+          <h1>Further reading</h1>
+          <p class="lede">The books, articles and community resources worth your time, roughly in the order you might read them.</p>
+        </header>
+        <h2 id="books">Books</h2>
+<table>
+  <thead><tr><th>Book</th><th>Why read it</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Learning Domain-Driven Design</strong>, Vlad Khononov (O'Reilly, 2021)</td><td>The most approachable modern introduction. It covers strategic and tactical design and connects DDD to microservices, event-driven architecture and data mesh. A good first book.</td></tr>
+    <tr><td><strong>Domain-Driven Design Distilled</strong>, Vaughn Vernon (Addison-Wesley, 2016)</td><td>Short and practical. Read it in an afternoon to get the whole picture.</td></tr>
+    <tr><td><strong>Domain-Driven Design: Tackling Complexity in the Heart of Software</strong>, Eric Evans (Addison-Wesley, 2003)</td><td>The original "blue book". Dense, but the source of every idea here. Parts III and IV (supple design, strategic design) are often underrated.</td></tr>
+    <tr><td><strong>Implementing Domain-Driven Design</strong>, Vaughn Vernon (Addison-Wesley, 2013)</td><td>The "red book". Detailed implementation guidance, including the aggregate design rules used in this guide.</td></tr>
+    <tr><td><strong>Domain Modeling Made Functional</strong>, Scott Wlaschin (Pragmatic Bookshelf, 2018)</td><td>DDD with types in F#. Excellent on making illegal states unrepresentable, and useful in any language.</td></tr>
+    <tr><td><strong>Architecture Patterns with Python</strong>, Harry Percival & Bob Gregory (O'Reilly, 2020)</td><td>Repository, unit of work, events and CQRS built step by step with tests. Free online at cosmicpython.com.</td></tr>
+    <tr><td><strong>Introducing EventStorming</strong>, Alberto Brandolini (Leanpub)</td><td>From the creator of Event Storming.</td></tr>
+    <tr><td><strong>Domain Storytelling</strong>, Stefan Hofer & Henning Schwentner (Addison-Wesley, 2021)</td><td>A complete guide to the technique.</td></tr>
+    <tr><td><strong>Team Topologies</strong>, Matthew Skelton & Manuel Pais (IT Revolution, 2019)</td><td>Team design that complements context mapping and Conway's law.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="articles">Articles & essays</h2>
+<ul>
+  <li><strong>Effective Aggregate Design</strong> (parts I–III), Vaughn Vernon: the origin of the aggregate rules.</li>
+  <li><strong>Getting Started with DDD When Surrounded by Legacy Systems</strong>, Eric Evans: bubble and autonomous bubble contexts.</li>
+  <li><strong>Anemic Domain Model</strong>, <strong>Bounded Context</strong>, <strong>CQRS</strong>, <strong>Strangler Fig Application</strong>: short essays on martinfowler.com.</li>
+  <li><strong>Hexagonal Architecture</strong>, Alistair Cockburn: the original ports & adapters article.</li>
+  <li><strong>Domain-Driven Design Reference</strong>, Eric Evans: a free summary of all the patterns, written by Evans in 2015.</li>
+</ul>
+
+<h2 id="community">Community resources</h2>
+<ul>
+  <li><strong>DDD Crew</strong> (<a href="https://github.com/ddd-crew">github.com/ddd-crew</a>): free, open templates and guides, including the Bounded Context Canvas, Aggregate Design Canvas, Context Mapping cheat sheet, Core Domain Charts and the DDD Starter Modelling Process.</li>
+  <li><strong>Virtual DDD</strong>, <strong>DDD Europe</strong> and <strong>Explore DDD</strong>: meetups and conference talks, many recorded and free online.</li>
+  <li><strong>Context Mapper</strong> (contextmapper.org): a DSL and tooling for context maps.</li>
+</ul>
+
+<h2 id="practice">How to practise</h2>
+<ol>
+  <li>Pick a domain you know well from outside work: a sports league, a library, your favourite shop.</li>
+  <li>Run a solo Event Storming on paper. Find the hotspots.</li>
+  <li>Draw the subdomains and a context map. Decide which context is core.</li>
+  <li>Model that one context's aggregates with the <a href="https://github.com/ddd-crew/aggregate-design-canvas">Aggregate Design Canvas</a>.</li>
+  <li>Implement it with tests that read like rules. Then change a requirement and see how the model copes.</li>
+</ol>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="glossary.html"><small>← Previous</small>Glossary</a><span></span></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/further-reading.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

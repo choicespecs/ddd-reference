@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Breaking the business into parts, then deciding which parts deserve your best people and most careful modelling.">
+<title>Subdomains — DDD Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hl-dark" disabled>
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Chapters">
+    <a class="brand" href="index.html">DDD Reference</a>
+    <a class="repo" href="https://github.com/choicespecs/ddd-reference">View on GitHub ↗</a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search headings…  ( / )" autocomplete="off" aria-label="Search">
+      <ol id="search-results" hidden></ol>
+    </div>
+    <div class="nav-group">Start</div><ol>
+<li><a href="index.html">Domain-Driven Design, explained</a></li>
+<li><a href="why-ddd.html">Why DDD?</a></li>
+<li><a href="running-example.html">The running example</a></li>
+</ol>
+<div class="nav-group">Strategic design</div><ol>
+<li><a href="ubiquitous-language.html">Ubiquitous language</a></li>
+<li><a href="subdomains.html" aria-current="page" class="on">Subdomains</a></li>
+<li><a href="discovery.html">Discovering the domain</a></li>
+<li><a href="bounded-contexts.html">Bounded contexts</a></li>
+<li><a href="context-mapping.html">Context mapping</a></li>
+</ol>
+<div class="nav-group">Tactical design</div><ol>
+<li><a href="entities-value-objects.html">Entities &amp; value objects</a></li>
+<li><a href="aggregates.html">Aggregates</a></li>
+<li><a href="domain-events.html">Domain events</a></li>
+<li><a href="repositories-factories.html">Repositories &amp; factories</a></li>
+<li><a href="services.html">Domain &amp; application services</a></li>
+</ol>
+<div class="nav-group">Architecture</div><ol>
+<li><a href="architecture.html">Architecture for a domain model</a></li>
+<li><a href="integrating-contexts.html">Integrating bounded contexts</a></li>
+<li><a href="cqrs-event-sourcing.html">CQRS &amp; event sourcing</a></li>
+</ol>
+<div class="nav-group">Practice</div><ol>
+<li><a href="testing.html">Testing the model</a></li>
+<li><a href="anti-patterns.html">Anti-patterns</a></li>
+<li><a href="legacy.html">DDD in legacy systems</a></li>
+<li><a href="checklist.html">Design checklist</a></li>
+</ol>
+<div class="nav-group">Reference</div><ol>
+<li><a href="glossary.html">Glossary</a></li>
+<li><a href="further-reading.html">Further reading</a></li>
+</ol>
+  </nav>
+  <div class="main-wrap">
+    <header class="topbar">
+      <button id="menu" class="icon-btn" aria-label="Open chapters" aria-controls="rail">☰</button>
+      <span class="crumbs"><a href="index.html">Guide</a> / Strategic design</span>
+      <button id="theme" class="icon-btn" aria-label="Toggle dark mode">◐</button>
+    </header>
+    <main id="content">
+      <article>
+        <header class="chapter-head">
+          <span class="eyebrow">Strategic design</span>
+          <h1>Subdomains</h1>
+          <p class="lede">Breaking the business into parts, then deciding which parts deserve your best people and most careful modelling.</p>
+        </header>
+        <h2 id="problem-vs-solution">Problem space vs. solution space</h2>
+<p>A <strong>domain</strong> is the area of business you're building software for, such as live-event ticketing. A <strong>subdomain</strong> is a coherent part of that business: on-sale fairness, payments, door admission. Subdomains describe the <em>problem space</em>. They exist whether or not any software does.</p>
+<p><a href="bounded-contexts.html">Bounded contexts</a> belong to the <em>solution space</em>. They are the boundaries <em>you</em> choose for models and code. Ideally each subdomain maps to one bounded context, but they're distinct ideas and they don't always line up.</p>
+
+<h2 id="three-types">The three types</h2>
+<table>
+  <thead><tr><th></th><th>Core</th><th>Supporting</th><th>Generic</th></tr></thead>
+  <tbody>
+    <tr><td><strong>What</strong></td><td>What makes the business different and wins customers</td><td>Necessary and specific to you, but not a differentiator</td><td>Solved problems that every business has</td></tr>
+    <tr><td><strong>Complexity</strong></td><td>High</td><td>Low to moderate</td><td>Can be high, but someone else has solved it</td></tr>
+    <tr><td><strong>Change rate</strong></td><td>Frequent; you're experimenting</td><td>Occasional</td><td>Rare (for you)</td></tr>
+    <tr><td><strong>Strategy</strong></td><td>Build in-house, best people, full DDD tactical patterns</td><td>Build simply (CRUD or transaction script), or outsource</td><td>Buy, use SaaS or open source; integrate behind an adapter</td></tr>
+    <tr><td><strong>Fieldhouse</strong></td><td>Sales (holds, limits, fairness)</td><td>Event Planning, Admission</td><td>Payments, Notifications, identity</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip"><span class="label">The key question</span>
+<p>"If we did this <em>exactly</em> as well as our competitors, would we lose anything?" If the answer is no, it isn't core. Spend the modelling effort somewhere else.</p>
+</div>
+
+<h2 id="investment">Matching investment to type</h2>
+
+<pre class="mermaid">
+quadrantChart
+  title Where to invest modelling effort
+  x-axis Low differentiation --&gt; High differentiation
+  y-axis Low complexity --&gt; High complexity
+  quadrant-1 Core - model deeply
+  quadrant-2 Generic - buy it
+  quadrant-3 Supporting - keep simple
+  quadrant-4 Watch for change
+  Sales: [0.85, 0.85]
+  Payments: [0.15, 0.75]
+  Notifications: [0.1, 0.3]
+  Event Planning: [0.4, 0.35]
+  Admission: [0.35, 0.5]
+</pre>
+
+<ul>
+  <li><strong>Core</strong>: rich domain model, aggregates, thorough tests, constant refinement with experts. This is where DDD's tactical patterns earn their cost.</li>
+  <li><strong>Supporting</strong>: the simplest thing that works. A CRUD module with validation is fine. Don't build aggregates and event buses for a venue-address form.</li>
+  <li><strong>Generic</strong>: integrate a product (a payment provider, an email service) and isolate it behind an <a href="context-mapping.html#acl">anti-corruption layer</a> so it can't distort your model.</li>
+</ul>
+
+<h2 id="distillation">Distilling the core</h2>
+<p>Evans calls the work of separating the core from everything else <strong>distillation</strong>. Useful techniques:</p>
+<ul>
+  <li><strong>Domain vision statement</strong>: one page saying what the core domain is and why it matters. Example: "Fieldhouse wins organisers because on-sales are fair to fans: no overselling, no bots hoarding seats, and released seats get back on sale within seconds."</li>
+  <li><strong>Highlighted core</strong>: mark the core modules explicitly so newcomers know where the important code is.</li>
+  <li><strong>Segregated core</strong>: move supporting logic <em>out</em> of the core modules so the core stays small and readable.</li>
+  <li><strong>Generic subdomain extraction</strong>: when you notice a generic concern (time zones, money, address formats) tangled in the core, pull it out into a library or service.</li>
+</ul>
+
+<h2 id="it-changes">Classifications change</h2>
+<p>A subdomain's type isn't permanent. A supporting subdomain can become core when the strategy shifts. If Fieldhouse decided to compete on "fastest door entry", Admission would become core. A core subdomain can also become generic once the market catches up. Revisit the classification when the business strategy changes.</p>
+        <nav class="pager" aria-label="Previous and next"><a class="prev" href="ubiquitous-language.html"><small>← Previous</small>Ubiquitous language</a><a class="next" href="discovery.html"><small>Next →</small>Discovering the domain</a></nav>
+        <footer class="foot">Spotted a mistake or want to add something? <a href="https://github.com/choicespecs/ddd-reference/edit/main/docs/_chapters/subdomains.html">Edit this page on GitHub</a>.</footer>
+      </article>
+      <aside class="toc" aria-label="On this page"><div class="eyebrow">On this page</div><ol id="toc"></ol></aside>
+    </main>
+  </div>
+</div>
+<script src="assets/search-index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>
